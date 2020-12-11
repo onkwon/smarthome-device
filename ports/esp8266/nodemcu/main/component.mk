@@ -6,4 +6,5 @@
 # in the build directory. This behaviour is entirely configurable,
 # please read the ESP-IDF documents if you need to do this.
 #
-COMPONENT_ADD_LDFLAGS += $(BUILD_DIR_BASE)/libapp.a
+COMPONENT_ADD_LDFLAGS += -L$(BUILD_DIR_BASE) -lapp
+COMPONENT_PRIV_INCLUDEDIRS += ../../../../external/libmcu/include
