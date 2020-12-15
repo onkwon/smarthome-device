@@ -19,11 +19,12 @@ APP_DEFINES  = \
 	VERSION=$(VERSION)
 
 EXTRA_SRCS = \
+	external/libmcu/src/jobqueue.c \
 	external/libmcu/src/logging.c \
 	external/libmcu/examples/logging/fake_storage.c
 EXTRA_INCS = \
 	external/libmcu/include \
-	external/libmcu/examples
+	external/libmcu/include/libmcu/posix
 
 # Toolchains
 ifneq ($(CROSS_COMPILE),)

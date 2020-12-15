@@ -7,4 +7,8 @@
 # please read the ESP-IDF documents if you need to do this.
 #
 COMPONENT_ADD_LDFLAGS += -L$(BUILD_DIR_BASE) -lapp
-COMPONENT_PRIV_INCLUDEDIRS += ../../../../external/libmcu/include
+COMPONENT_PRIV_INCLUDEDIRS += \
+			      ../../../../external/libmcu/include \
+			      ../../../../external/libmcu/include/libmcu/posix \
+			      ../../../../external/libmcu/examples \
+			      ../../../../
