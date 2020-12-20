@@ -49,12 +49,12 @@ void system_reboot(void)
 	while (1);
 }
 
-unsigned int system_get_free_heap_bytes(void)
+unsigned long system_get_free_heap_bytes(void)
 {
 	return esp_get_free_heap_size();
 }
 
-unsigned int system_get_current_stack_watermark(void)
+unsigned long system_get_current_stack_watermark(void)
 {
 	return uxTaskGetStackHighWaterMark(NULL);
 }
@@ -96,4 +96,9 @@ void system_print_tasks_info(void)
 	printf("%s\n", task_list_buffer);
 	free(task_list_buffer);
 #endif
+}
+
+int system_random(void)
+{
+	return esp_random();
 }

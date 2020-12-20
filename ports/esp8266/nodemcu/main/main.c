@@ -6,14 +6,7 @@
 #include "esp_system.h"
 
 #define DEFAULT_TASK_PRIORITY			1
-#define DEFAULT_TASK_STACK_SIZE			2048
-
-#include "libmcu/logging.h"
-#include "logging/fake_storage.h"
-static void fake_logging_init(void)
-{
-	logging_init(logging_fake_storage_init(puts));
-}
+#define DEFAULT_TASK_STACK_SIZE			3072
 
 static void esp_init(void)
 {
@@ -30,8 +23,6 @@ static void start_application(void *e)
 
 void app_main(void)
 {
-	fake_logging_init();
-
 	esp_init();
 
 	extern void app_start(void);

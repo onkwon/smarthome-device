@@ -21,7 +21,7 @@ APP_DEFINES  = \
 EXTRA_SRCS = \
 	external/libmcu/src/jobqueue.c \
 	external/libmcu/src/logging.c \
-	external/libmcu/examples/logging/fake_storage.c
+	external/libmcu/src/retry.c
 EXTRA_INCS = \
 	external/libmcu/include \
 	external/libmcu/include/libmcu/posix

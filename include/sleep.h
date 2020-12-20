@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-void sleep_ms(unsigned long msec);
+void sleep_ms(unsigned int msec);
 
 #if defined(__cplusplus)
 }

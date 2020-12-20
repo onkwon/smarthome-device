@@ -8,7 +8,11 @@
 #
 COMPONENT_ADD_LDFLAGS += -L$(BUILD_DIR_BASE) -lapp
 COMPONENT_PRIV_INCLUDEDIRS += \
-			      ../../../../external/libmcu/include \
-			      ../../../../external/libmcu/include/libmcu/posix \
-			      ../../../../external/libmcu/examples \
-			      ../../../../
+	../../../../external/libmcu/include \
+	../../../../external/libmcu/include/libmcu/posix \
+	../../../../external/libmcu/examples \
+	../../../../
+COMPONENT_EMBED_TXTFILES := \
+	../../../../AmazonRootCA1.pem \
+	../../../../certificate.pem.crt \
+	../../../../private.pem.key
