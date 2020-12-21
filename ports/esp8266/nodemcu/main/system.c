@@ -102,3 +102,8 @@ int system_random(void)
 {
 	return esp_random();
 }
+
+const char *system_get_serial_number_string(void)
+{
+	return "sn1234";
+}

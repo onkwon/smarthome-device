@@ -42,3 +42,8 @@ bool jobpool_schedule(void (*job)(void *context), void *job_context)
 
 	return true;
 }
+
+unsigned int jobpool_count(void)
+{
+	return (unsigned int)job_count(m.jobqueue);
+}

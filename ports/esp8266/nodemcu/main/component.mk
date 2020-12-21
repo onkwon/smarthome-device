@@ -13,6 +13,6 @@ COMPONENT_PRIV_INCLUDEDIRS += \
 	../../../../external/libmcu/examples \
 	../../../../
 COMPONENT_EMBED_TXTFILES := \
-	../../../../AmazonRootCA1.pem \
-	../../../../certificate.pem.crt \
-	../../../../private.pem.key
+	../../../../certs/ca.crt \
+	../../../../certs/device.crt \
+	../../../../certs/device.key
