@@ -9,6 +9,7 @@
 #include "esp_wifi.h"
 
 #include "libmcu/logging.h"
+#include "libmcu/compiler.h"
 
 #define PASSWORD_MAXLEN			63
 
@@ -30,6 +31,7 @@ static struct {
 
 static void wifi_event_handler(void *arg, int32_t event_id, void *event_data)
 {
+	unused(arg);
 	system_event_sta_disconnected_t *disconnected_event;
 	wifi_ap_record_t ap;
 	wifiman_event_t etype = WIFIMAN_EVENT_UNKNOWN;
@@ -95,6 +97,7 @@ static void wifi_event_handler(void *arg, int32_t event_id, void *event_data)
 
 static void ip_event_handler(void *arg, int32_t event_id, void *event_data)
 {
+	unused(arg);
 	ip_event_got_ip_t *event;
 
 	switch (event_id) {

@@ -11,32 +11,26 @@
 
 #include "sleep.h"
 #include "jobpool.h"
+#include "ota/ota.h"
+#include "topic.h"
 
 #include "wifi.h"
 #include "mqtt.h"
 
-#define TEST_WIFI_SSID			""
-#define TEST_WIFI_PASS			""
+#define TEST_WIFI_SSID				""
+#define TEST_WIFI_PASS				""
 
-#define DEFAULT_MQTT_BROKER_ENDPOINT	""
-#define DEFAULT_TOPIC_PREFIX		"all/hello"
+#define DEFAULT_MQTT_BROKER_ENDPOINT		""
 
 extern const uint8_t x509_ca_cert[] asm("_binary_ca_crt_start");
 extern const uint8_t x509_device_cert[] asm("_binary_device_crt_start");
 extern const uint8_t x509_device_key[] asm("_binary_device_key_start");
 
+const char *TOPICS[TOPIC_MAX];
+
 static struct {
 	volatile bool reconnecting;
 	mqtt_t *mqtt;
-
-	struct {
-		const char *version;
-		const char *event;
-		const char *logging;
-		const char *report;
-		const char *heartbeat;
-		const char *will;
-	} topic;
 } m;
 
 static void wifi_reconnect(void LIBMCU_UNUSED *context)
@@ -71,8 +65,8 @@ static void wifi_state_change_event(wifiman_event_t event,
 			"connected" : "disconnected");
 	if (event == WIFIMAN_EVENT_DISCONNECTED
 			&& m.reconnecting == false) {
-		bool scheduled = jobpool_schedule(wifi_reconnect, NULL);
 		m.reconnecting = true;
+		bool scheduled = jobpool_schedule(wifi_reconnect, NULL);
 		assert(scheduled == true);
 		info("Try to reconnect");
 	}
@@ -101,17 +95,31 @@ static bool network_interface_init(void)
 	return true;
 }
 
-static const char *get_topic_path_allocated(const char *client_id,
-		const char *sub_topic)
+static const char *get_topic_path_allocated(bool subscribe,
+		const char *client_id, const char *sub_topic)
 {
-	size_t len = sizeof(DEFAULT_TOPIC_PREFIX)
-		+ strlen(client_id)
-		+ strlen(sub_topic) + 2/*delimiter*/ + 1/*null*/;
-	char *topic = (char *)malloc(len);
+	size_t len = sizeof(TOPIC_DEFAULT_SUBSCRIBE_PREFIX)
+		+ strlen(client_id) + 2/*delimiter*/ + 1/*null*/;
+	char base[sizeof(TOPIC_DEFAULT_SUBSCRIBE_PREFIX)+1]
+		= TOPIC_DEFAULT_SUBSCRIBE_PREFIX;
+	if (!subscribe) {
+		len -= sizeof(TOPIC_DEFAULT_SUBSCRIBE_PREFIX)
+			- sizeof(TOPIC_DEFAULT_PREFIX);
+		strcpy(base, TOPIC_DEFAULT_PREFIX);
+	}
+	if (sub_topic != NULL) {
+		len += strlen(sub_topic);
+	}
 
+	char *topic = (char *)malloc(len);
 	if (topic != NULL) {
-		snprintf(topic, len-1,
-			DEFAULT_TOPIC_PREFIX"/%s/%s", client_id, sub_topic);
+		int written = snprintf(topic, len-1, "%s/%s", base, client_id);
+		if (written <= 0) {
+			free(topic);
+			return NULL;
+		}
+		snprintf(&topic[written], len-(size_t)written-1,
+				"/%s", sub_topic);
 		topic[len-1] = '\0';
 	}
 
@@ -124,7 +132,7 @@ static bool open_mqtt_connection(const char *client_id)
 
 	if (mqtt_set_lwt(m.mqtt, &(mqtt_message_t) {
 				.qos = MQTT_QOS_1,
-				.topic = m.topic.will,
+				.topic = TOPICS[TOPIC_PUB_WILL],
 				.payload = (const uint8_t *)"lost",
 				.payload_size = 4, })
 			!= MQTT_SUCCESS) {
@@ -156,40 +164,33 @@ static void message_received(void * const context,
 static void version_received(void * const context,
 		const mqtt_message_t * const msg)
 {
-	unused(context);
-	debug("VERSION: %s, %.*s", def2str(VERSION),
+	info("Update requested from %s to %.*s",
+			&def2str(VERSION_TAG)[1],
 			msg->payload_size, msg->payload);
+
+	ota_start(context, msg->payload, msg->payload_size);
 }
 
-static bool subscribe_topics(void)
+static bool subscribe_topics(void *context)
 {
 	mqtt_subscribe_t version = {
-		.topic_filter = m.topic.version,
+		.topic_filter = TOPICS[TOPIC_SUB_VERSION],
 		.qos = MQTT_QOS_1,
 		.callback = {
 			.run = version_received,
-			.context = NULL,
-		},
-	};
-	mqtt_subscribe_t event = {
-		.topic_filter = m.topic.event,
-		.qos = MQTT_QOS_1,
-		.callback = {
-			.run = message_received,
-			.context = NULL,
+			.context = context,
 		},
 	};
 	mqtt_subscribe_t logging = {
-		.topic_filter = m.topic.logging,
+		.topic_filter = TOPICS[TOPIC_SUB_LOGGING],
 		.qos = MQTT_QOS_1,
 		.callback = {
 			.run = message_received,
-			.context = NULL,
+			.context = context,
 		},
 	};
 
 	if (mqtt_subscribe(m.mqtt, &version) != MQTT_SUCCESS
-			|| mqtt_subscribe(m.mqtt, &event) != MQTT_SUCCESS
 			|| mqtt_subscribe(m.mqtt, &logging) != MQTT_SUCCESS) {
 		return false;
 	}
@@ -197,22 +198,23 @@ static bool subscribe_topics(void)
 	return true;
 }
 
-static bool module_init(const char *reporter_name)
+static bool module_topic_init(const char *reporter_name)
 {
-	m.topic.version = get_topic_path_allocated(reporter_name, "version");
-	m.topic.event = get_topic_path_allocated(reporter_name, "event");
-	m.topic.report = get_topic_path_allocated(reporter_name, "report");
-	m.topic.logging = get_topic_path_allocated(reporter_name, "logging");
-	m.topic.heartbeat = get_topic_path_allocated(reporter_name, "heartbeat");
-	m.topic.will = get_topic_path_allocated(reporter_name, "will");
+	TOPICS[TOPIC_SUB_LOGGING]
+		= get_topic_path_allocated(1, reporter_name, "logging");
+	TOPICS[TOPIC_SUB_VERSION]
+		= get_topic_path_allocated(1, reporter_name, "version");
+	TOPICS[TOPIC_SUB_VERSION_DATA]
+		= get_topic_path_allocated(1, reporter_name, "version/data");
+	TOPICS[TOPIC_PUB_EVENT]
+		= get_topic_path_allocated(0, reporter_name, "event");
+	TOPICS[TOPIC_PUB_WILL]
+		= get_topic_path_allocated(0, reporter_name, "will");
 
-	if (m.topic.version == NULL
-			|| m.topic.event == NULL
-			|| m.topic.report == NULL
-			|| m.topic.logging == NULL
-			|| m.topic.heartbeat == NULL
-			|| m.topic.will == NULL) {
-		return false;
+	for (int i = 0; i < TOPIC_MAX; i++) {
+		if (TOPICS[i] == NULL) {
+			return false;
+		}
 	}
 
 	return true;
@@ -224,7 +226,7 @@ bool reporter_send(const void *data, size_t data_size)
 	debug("rssi %d", wifiman_get_rssi());
 	return mqtt_publish(m.mqtt, &(mqtt_message_t) {
 			.qos = MQTT_QOS_1,
-			.topic = m.topic.report,
+			.topic = TOPICS[TOPIC_PUB_EVENT],
 			.payload = (const uint8_t *)data,
 			.payload_size = data_size, })
 		== MQTT_SUCCESS;
@@ -249,20 +251,21 @@ bool reporter_start(void)
 	return false;
 }
 
-bool reporter_init(const char *reporter_name)
+reporter_t *reporter_new(const char *reporter_name)
 {
-	if (!module_init(reporter_name)) {
-		return false;
+	if (!module_topic_init(reporter_name)) {
+		return NULL;
 	}
 	if (!network_interface_init()) {
-		return false;
+		return NULL;
 	}
 	if (!open_mqtt_connection(reporter_name)) {
-		return false;
+		return NULL;
 	}
-	if (!subscribe_topics()) {
-		return false;
+	if (!subscribe_topics(m.mqtt)) {
+		return NULL;
 	}
+
 #if 1
 	uint8_t ip[4], mac[6] = { 0, };
 	wifiman_get_ip(ip);
@@ -281,5 +284,5 @@ bool reporter_init(const char *reporter_name)
 	}
 #endif
 
-	return true;
+	return (reporter_t *)m.mqtt;
 }

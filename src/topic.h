@@ -1,0 +1,18 @@
+#ifndef TOPIC_H
+#define TOPIC_H
+
+#define TOPIC_DEFAULT_PREFIX			"all/hello"
+#define TOPIC_DEFAULT_SUBSCRIBE_PREFIX		"cmd/"TOPIC_DEFAULT_PREFIX
+
+enum {
+	TOPIC_SUB_VERSION			= 0,
+	TOPIC_SUB_VERSION_DATA,
+	TOPIC_PUB_EVENT,
+	TOPIC_SUB_LOGGING,
+	TOPIC_PUB_WILL,
+	TOPIC_MAX,
+};
+
+extern const char *TOPICS[TOPIC_MAX];
+
+#endif /* TOPIC_H */

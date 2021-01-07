@@ -4,16 +4,35 @@
 #include "sleep.h"
 #include "jobpool.h"
 #include "reporter.h"
+#include "ota/ota.h"
+#include "ota/protocol/mqtt.h"
+#include "ota/format/json.h"
 
 extern void system_print_tasks_info(void);
 void application(void);
 
+#include <stdio.h>
+#include "memory_storage.h"
+#include "libmcu/compiler.h"
+void memory_storage_write_hook(const void *data, size_t size)
+{
+	unused(size);
+	char buf[LOGGING_MESSAGE_MAXLEN + 32];
+	puts(logging_stringify(buf, sizeof(buf), data));
+	puts("\n");
+}
+
 void application(void)
 {
+	static uint8_t logbuf[1024];
+	logging_init(memory_storage_init(logbuf, sizeof(logbuf)));
+
 	bool initialized = jobpool_init();
 	assert(initialized == true);
-	initialized = reporter_init(system_get_serial_number_string());
-	assert(initialized == true);
+
+	reporter_t *reporter = reporter_new(system_get_serial_number_string());
+	assert(reporter != NULL);
+	ota_init(reporter, ota_mqtt(), ota_json_parser());
 
 	while (1) {
 		system_print_tasks_info();
@@ -25,28 +44,4 @@ void application(void)
 		sleep_ms(10000);
 		//wifiman_disconnect();
 	}
-}
-
-#include <stdio.h>
-#include <stdarg.h>
-#include <time.h>
-size_t logging_save(const logging_t type, const void *pc, const void *lr, ...)
-{
-	int len = printf("%lu: [%s] <%p,%p> ", (unsigned long)time(0),
-			type == 0? "VERBOSE" :
-			type == 1? "DEBUG" :
-			type == 2? "INFO" :
-			type == 3? "NOTICE" :
-			type == 4? "WARN" :
-			type == 5? "ERROR" :
-			type == 6? "ALERT" : "UNKNOWN",
-			pc, lr);
-	va_list ap;
-	va_start(ap, lr);
-	const char *fmt = va_arg(ap, char *);
-	if (fmt) {
-		len += vfprintf(stdout, fmt, ap);
-		len += printf("\n");
-	}
-	return (size_t)len;
 }

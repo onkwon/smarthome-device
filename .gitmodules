@@ -4,3 +4,6 @@
 [submodule "external/libmcu"]
 	path = external/libmcu
 	url = https://github.com/onkwon/libmcu.git
+[submodule "external/jsmn"]
+	path = external/jsmn
+	url = https://github.com/zserge/jsmn.git

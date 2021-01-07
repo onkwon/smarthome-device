@@ -4,6 +4,10 @@
 #include "esp_system.h"
 #include "esp_ota_ops.h"
 
+unsigned long system_get_nr_tasks(void);
+const char *system_get_current_task_name(void);
+void system_print_tasks_info(void);
+
 static const char *stringify_reboot_reason(int reason)
 {
 	switch (reason) {
@@ -35,7 +39,8 @@ static const char *stringify_reboot_reason(int reason)
 
 static int get_reboot_reason(void)
 {
-	return (int)esp_reset_reason();
+	int rc = esp_reset_reason();
+	return rc;
 }
 
 const char *system_get_reboot_reason_string(void)

@@ -7,6 +7,7 @@
 #include <assert.h>
 
 #include "libmcu/logging.h"
+#include "libmcu/compiler.h"
 #include "mqtt_client.h"
 #include "include/jobpool.h"
 
@@ -159,6 +160,10 @@ static void resubscribe_topics(void *context)
 static void process_incoming_publish(const mqtt_t * const mqtt,
 		const esp_mqtt_event_handle_t event)
 {
+	debug("Incoming message to %.*s: %.*s",
+			event->topic_len, event->topic,
+			event->data_len, event->data);
+
 	const mqtt_subscribe_t *sub = get_subscription_by_topic(mqtt,
 			event->topic);
 	if (sub != NULL) {
@@ -170,15 +175,13 @@ static void process_incoming_publish(const mqtt_t * const mqtt,
 		};
 		sub->callback.run(sub->callback.context, &t);
 	}
-
-	info("Incoming message to %.*s: %.*s",
-			event->topic_len, event->topic,
-			event->data_len, event->data);
 }
 
 static void process_response(const mqtt_t * const mqtt,
 		const esp_mqtt_event_handle_t event)
 {
+	unused(mqtt);
+
 	switch (event->event_id) {
 	case MQTT_EVENT_SUBSCRIBED:
 		info("Subscribed to %.*s", event->topic_len, event->topic);
@@ -201,6 +204,10 @@ static void mqtt_event_handler(void *context,
 	mqtt_t *mqtt = (mqtt_t *)context;
 	esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
 	esp_mqtt_client_handle_t client = event->client;
+
+	unused(client);
+	unused(base);
+	unused(event_id);
 
 	switch (event->event_id) {
 	case MQTT_EVENT_DATA:

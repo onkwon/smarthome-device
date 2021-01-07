@@ -4,6 +4,7 @@ clang
 
 -Iinclude
 -Iexternal/libmcu/include
+-Iexternal/libmcu/include/libmcu/posix
 -I/usr/local/Cellar/cpputest/4.0/include
 
 -isystem /usr/local/include

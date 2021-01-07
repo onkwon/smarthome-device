@@ -4,13 +4,16 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-bool reporter_init(const char *reporter_name);
+typedef struct reporter_s reporter_t;
+
+reporter_t *reporter_new(const char *reporter_name);
 bool reporter_start(void);
 
-/* send as soon as possible */
+/* send sensor data asynchnously */
 bool reporter_send(const void *data, size_t data_size);
+/* send system event asynchnously */
 bool reporter_send_event(const void *data, size_t data_size);
-/* send periodic with its own interval */
+/* send sensor data periodic in sync with its own interval */
 bool reporter_collect(const void *data, size_t data_size);
 
 #endif /* REPORTER_H */

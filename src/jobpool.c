@@ -4,6 +4,9 @@
 #if !defined(JOBPOOL_MAX_JOBS)
 #define JOBPOOL_MAX_JOBS		8
 #endif
+#if !defined(JOBPOOL_MAX_THREADS)
+#define JOBPOOL_MAX_THREADS		3
+#endif
 
 static struct {
 	jobqueue_t *jobqueue;
@@ -21,7 +24,7 @@ bool jobpool_init(void)
 			.stack_size_bytes = JOBQUEUE_DEFAULT_STACK_SIZE,
 			.priority = JOBQUEUE_DEFAULT_PRIORITY,
 			.min_threads = 1,
-			.max_threads = 2,
+			.max_threads = JOBPOOL_MAX_THREADS,
 			}) != JOB_SUCCESS) {
 		return false;
 	}
