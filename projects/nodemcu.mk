@@ -9,9 +9,6 @@ LDFLAGS += -nostartfiles -Wl,--just-symbols=$(OUTDIR)/$(PLATFORM).elf
 LD_SCRIPT += $(PLATFORM_DIR)/app.ld
 DEFS += __ESP_FILE__=\"null\"
 
-EXTERNAL_SRCS += apploader/dfu.c
-EXTERNAL_INCS += apploader
-
 ## Compiler errors
 CFLAGS += \
 	  -Wno-error=cast-qual \
@@ -145,7 +142,7 @@ $(OUTDIR)/apploader.bin: $(OUTDIR)/apploader.elf
 	$(info generating  $@)
 	$(Q)$(SZ) $<
 	$(Q)$(OC) -O binary $< $@
-$(OUTDIR)/apploader.elf: apploader/main.c apploader/dfu.c \
+$(OUTDIR)/apploader.elf: apploader/main.c src/dfu/dfu.c \
 				ports/esp8266/nodemcu/src/dfu_flash.c \
 				ports/esp8266/nodemcu/src/sha256.c \
 				$(OUTDIR)/$(PLATFORM).bin \

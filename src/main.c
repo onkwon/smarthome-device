@@ -7,8 +7,8 @@
 #include "ota/ota.h"
 #include "ota/protocol/mqtt.h"
 #include "ota/format/json.h"
-#include "dfu.h"
-#include "dfu_flash.h"
+#include "dfu/dfu.h"
+#include "dfu/flash.h"
 
 extern void system_print_tasks_info(void);
 void application(void);

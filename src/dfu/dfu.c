@@ -1,4 +1,4 @@
-#include "dfu.h"
+#include "dfu/dfu.h"
 #include <string.h>
 #include "libmcu/compiler.h"
 #include "sha256.h"

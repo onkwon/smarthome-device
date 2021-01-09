@@ -12,7 +12,7 @@
 #include "jobpool.h"
 #include "timext.h"
 #include "../topic.h"
-#include "dfu.h"
+#include "dfu/dfu.h"
 
 #define DEFAULT_FILE_CHUNK_SIZE		128
 #define OTA_TIMEOUT_SEC			300 // 5-min

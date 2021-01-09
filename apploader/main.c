@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include "dfu.h"
-#include "dfu_flash.h"
+#include "dfu/dfu.h"
+#include "dfu/flash.h"
 
 extern uintptr_t __loader_data_start;
 extern uintptr_t __loader_data_end;

@@ -8,7 +8,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
-#include "dfu_io.h"
+#include "dfu/io.h"
 
 #define DFU_MAGIC				0xC0DEFEEDUL
 

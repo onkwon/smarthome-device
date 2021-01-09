@@ -1,4 +1,4 @@
-#include "../apploader/dfu_flash.h"
+#include "dfu/flash.h"
 #include "esp_spi_flash.h"
 #include "nvs_flash.h"
 #include "libmcu/compiler.h"
