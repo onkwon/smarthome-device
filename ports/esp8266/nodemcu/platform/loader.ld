@@ -2,47 +2,47 @@ INCLUDE ports/esp8266/nodemcu/platform/common.ld
 
 MEMORY
 {
-	rom (rx)	: ORIGIN = 0x402A7000, LENGTH = 148K
+	rom (rx)	: ORIGIN = 0x402A5000, LENGTH = 4K
+	app (rx)	: ORIGIN = 0x402A7000, LENGTH = 148K
 }
 
-PROVIDE(__rom_start = ORIGIN(rom));
-PROVIDE(__rom_size  = LENGTH(rom));
+PROVIDE(__app_partition = ORIGIN(app) & 0xFFFFF);
 
 SECTIONS
 {
-	.text __rom_start :
+	.text :
 	{
-		KEEP(*(.text._app_init))
+		KEEP(*(.text.apploader))
 		*(.text*)
 
 		. = ALIGN(4);
 		*(.rodata*)
 
 		. = ALIGN(4);
-		PROVIDE(__app_text_end = .);
+		PROVIDE(__loader_text_end = .);
 	} > rom
 
 	.data :
 	{
 		. = ALIGN(4);
-		PROVIDE(__app_data_start = .);
+		PROVIDE(__loader_data_start = .);
 
 		*(.data*)
 
 		. = ALIGN(4);
-		PROVIDE(__app_data_end = .);
+		PROVIDE(__loader_data_end = .);
 	} > ram AT > rom
 
 	.bss (NOLOAD) :
 	{
 		. = ALIGN(4);
-		PROVIDE(__app_bss_start = .);
+		PROVIDE(__loader_bss_start = .);
 
 		*(.bss*)
 		*(COMMON)
 
 		. = ALIGN(4);
-		PROVIDE(__app_bss_end = .);
+		PROVIDE(__loader_bss_end = .);
 	} > ram AT > rom
 
 	.noinit (NOLOAD) :

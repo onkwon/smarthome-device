@@ -9,6 +9,9 @@ LDFLAGS += -nostartfiles -Wl,--just-symbols=$(OUTDIR)/$(PLATFORM).elf
 LD_SCRIPT += $(PLATFORM_DIR)/app.ld
 DEFS += __ESP_FILE__=\"null\"
 
+EXTERNAL_SRCS += apploader/dfu.c
+EXTERNAL_INCS += apploader
+
 ## Compiler errors
 CFLAGS += \
 	  -Wno-error=cast-qual \
@@ -41,15 +44,30 @@ EXTERNAL_INCS += \
 	$(PLATFORM_DIR) \
 	.
 
-all:: prerequisite
+all:: $(OUTELF).img
 
-.PHONY: prerequisite
-prerequisite:: $(OUTDIR)/$(PLATFORM).bin
+$(OUTELF).img: $(OUTBIN)
+	$(info generating  $@)
+	$(Q)printf "C0DEFEED" \
+		| tools/endian.sh \
+		| xxd -r -p > $@
+	$(Q)wc -c < $< \
+		| awk '{printf("%08x", $$1)}' \
+		| tools/endian.sh \
+		| xxd -r -p >> $@
+	$(Q)openssl dgst -sha256 $(OUTBIN) \
+		| awk '{print $$2}' \
+		| xxd -r -p >> $@
+	$(Q)cat $< >> $@
 
-$(OUTDIR)/$(PLATFORM).bin: $(OUTDIR)/$(PLATFORM).elf $(MAKEFILE_LIST)
-	$(info generating  $<)
+$(OUTELF):: $(OUTDIR)/$(PLATFORM).bin $(OUTDIR)/apploader.bin
+
+$(OUTDIR)/$(PLATFORM).bin: $(OUTDIR)/$(PLATFORM).elf $(MAKEFILE_LIST) \
+				$(PLATFORM_DIR)/loader.sym \
+				$(PLATFORM_DIR)/sdk.ld
+	$(info rewriting   $<)
 	$(Q)$(CC) \
-		-Wl,--just-symbols=$(PLATFORM_DIR)/app.sym \
+		-Wl,--just-symbols=$(PLATFORM_DIR)/loader.sym \
 		-nostdlib -Wl,-static -Wl,--gc-sections \
 		-u call_user_start_cpu0 -u esp_app_desc -u vsnprintf \
 		-Wl,--start-group \
@@ -93,6 +111,7 @@ $(OUTDIR)/$(PLATFORM).bin: $(OUTDIR)/$(PLATFORM).elf $(MAKEFILE_LIST)
 		-u pthread_attr_init -u pthread_exit -u pthread_create \
 		-u pthread_attr_setstacksize -u pthread_attr_setdetachstate \
 		-L$(OUTDIR)/spi_flash -lspi_flash \
+		-u spi_flash_erase_range \
 		-L$(OUTDIR)/tcp_transport -ltcp_transport \
 		-L$(OUTDIR)/tcpip_adapter -ltcpip_adapter \
 		-u tcpip_adapter_init \
@@ -103,6 +122,7 @@ $(OUTDIR)/$(PLATFORM).bin: $(OUTDIR)/$(PLATFORM).elf $(MAKEFILE_LIST)
 		-u esp_wifi_start -u esp_wifi_scan_start -u esp_wifi_set_config \
 		-u esp_wifi_sta_get_ap_info -u esp_wifi_connect \
 		-u esp_wifi_scan_get_ap_records \
+		-u esp_restart \
 		-lgcc -lstdc++ -Wl,--end-group -Wl,-EL \
 		-o $(OUTDIR)/$(PLATFORM).elf \
 		-Wl,-Map=$(OUTDIR)/$(PLATFORM).map \
@@ -111,14 +131,33 @@ $(OUTDIR)/$(PLATFORM).bin: $(OUTDIR)/$(PLATFORM).elf $(MAKEFILE_LIST)
 	$(Q)python $(PLATFORM_SDK_DIR)/components/esptool_py/esptool/esptool.py \
 		--chip esp8266 elf2image \
 		--version=3 \
-		-o $@ $<
+		-o $@ $< 1>/dev/null
 
-$(OUTDIR)/$(PLATFORM).elf:
+.PHONY: $(OUTDIR)/$(PLATFORM).elf
+$(OUTDIR)/$(PLATFORM).elf: $(PLATFORM_DIR)/loader.sym
 	$(info generating  $@ (this may take a while...))
 	$(Q)$(MAKE) -C $(PLATFORM_DIR) $(MAKEFLAGS) \
 		PLATFORM_BUILD_DIR=$(BASEDIR)/$(OUTDIR) \
-		EXTRA_LDFLAGS=-Wl,--just-symbols=app.sym \
+		EXTRA_LDFLAGS=-Wl,--just-symbols=loader.sym \
 		PLATFORM_PROJECT_NAME=$(PLATFORM) 1> /dev/null
+
+$(OUTDIR)/apploader.bin: $(OUTDIR)/apploader.elf
+	$(info generating  $@)
+	$(Q)$(SZ) $<
+	$(Q)$(OC) -O binary $< $@
+$(OUTDIR)/apploader.elf: apploader/main.c apploader/dfu.c \
+				ports/esp8266/nodemcu/src/dfu_flash.c \
+				ports/esp8266/nodemcu/src/sha256.c \
+				$(OUTDIR)/$(PLATFORM).bin \
+				$(PLATFORM_DIR)/loader.ld \
+				$(PLATFORM_DIR)/app.sym
+	$(info compiling   $(filter %.c,$^))
+	$(Q)$(CC) -o $@ $(filter %.c,$^) \
+		-Wl,--just-symbols=$(PLATFORM_DIR)/app.sym \
+		-Wl,--just-symbols=$(OUTDIR)/$(PLATFORM).elf \
+		-T $(PLATFORM_DIR)/loader.ld \
+		$(addprefix -D, $(DEFS)) $(addprefix -I, $(INCS)) \
+		$(CFLAGS)
 
 .PHONY: flash
 flash: all
@@ -135,7 +174,8 @@ flash: all
 		0x0 $(OUTDIR)/bootloader/bootloader.bin \
 		0x10000 $(OUTDIR)/esp8266.bin \
 		0x8000 $(OUTDIR)/partitions.bin \
-		0xA6010 $(OUTDIR)/nodemcu.bin
+		0xA5000 $(OUTDIR)/apploader.bin \
+		0xA7000 $(OUTDIR)/nodemcu.bin
 .PHONY: erase_flash
 erase_flash:
 	python $(PLATFORM_SDK_DIR)/components/esptool_py/esptool/esptool.py \

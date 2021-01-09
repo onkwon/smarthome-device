@@ -160,9 +160,8 @@ static void resubscribe_topics(void *context)
 static void process_incoming_publish(const mqtt_t * const mqtt,
 		const esp_mqtt_event_handle_t event)
 {
-	debug("Incoming message to %.*s: %.*s",
-			event->topic_len, event->topic,
-			event->data_len, event->data);
+	debug("Incoming message(%u) to %.*s",
+			event->data_len, event->topic_len, event->topic);
 
 	const mqtt_subscribe_t *sub = get_subscription_by_topic(mqtt,
 			event->topic);

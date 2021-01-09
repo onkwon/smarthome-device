@@ -8,17 +8,17 @@
 #define DEFAULT_TASK_PRIORITY				1
 #define DEFAULT_TASK_STACK_SIZE				3072
 
-extern uintptr_t _app_data;
-extern uintptr_t _app_data_end;
-extern uintptr_t _app_text_end;
-extern uintptr_t _app_bss;
-extern uintptr_t _app_bss_end;
+extern uintptr_t __app_data_start;
+extern uintptr_t __app_data_end;
+extern uintptr_t __app_text_end;
+extern uintptr_t __app_bss_start;
+extern uintptr_t __app_bss_end;
 
 extern void application(void);
 
-void _app_main(void);
-void start_application(void);
-void initialize_memory(void);
+void _app_init(void);
+void app_start(void);
+void app_initialize_memory(void);
 
 static void esp_init(void)
 {
@@ -33,31 +33,31 @@ static void app_wrapper(void *e)
 	vTaskDelete(NULL);
 }
 
-void initialize_memory(void)
+void app_initialize_memory(void)
 {
 	const uintptr_t *end, *src;
 	uintptr_t *dst;
 	uintptr_t i;
 
 	/* copy .data section from flash to ram */
-	dst = (uintptr_t *)&_app_data;
-	end = (const uintptr_t *)&_app_data_end;
-	src = (const uintptr_t *)&_app_text_end;
+	dst = (uintptr_t *)&__app_data_start;
+	end = (const uintptr_t *)&__app_data_end;
+	src = (const uintptr_t *)&__app_text_end;
 
 	for (i = 0; &dst[i] < end; i++) {
 		dst[i] = src[i];
 	}
 
 	/* clear .bss section */
-	dst = (uintptr_t *)&_app_bss;
-	end = (const uintptr_t *)&_app_bss_end;
+	dst = (uintptr_t *)&__app_bss_start;
+	end = (const uintptr_t *)&__app_bss_end;
 
 	for (i = 0; &dst[i] < end; i++) {
 		dst[i] = 0;
 	}
 }
 
-void start_application(void)
+void app_start(void)
 {
 	esp_init();
 
@@ -69,8 +69,8 @@ void start_application(void)
 			NULL);
 }
 
-void _app_main(void)
+void _app_init(void)
 {
-	initialize_memory();
-	start_application();
+	app_initialize_memory();
+	app_start();
 }

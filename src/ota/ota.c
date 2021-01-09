@@ -7,10 +7,12 @@
 
 #include "libmcu/logging.h"
 #include "libmcu/compiler.h"
+#include "libmcu/system.h"
 
 #include "jobpool.h"
 #include "timext.h"
 #include "../topic.h"
+#include "dfu.h"
 
 #define DEFAULT_FILE_CHUNK_SIZE		128
 #define OTA_TIMEOUT_SEC			300 // 5-min
@@ -21,6 +23,7 @@ static struct {
 	pthread_mutex_t lock;
 	bool active;
 	ota_request_t target;
+	dfu_t *dfu;
 
 	struct {
 		const ota_protocol_t *ops;
@@ -64,11 +67,11 @@ static void file_chunk_arrived(void *context, const void *data, size_t datasize)
 		goto out;
 	}
 
-	debug("file chunk arrived %.*s", chunk.data_size, chunk.data);
+	debug("file chunk arrived %u", chunk.data_size);
 
-	// 1. validate
-	// 2. flash temporal
-	m.target.file_chunk_index++;
+	if (dfu_write(m.dfu, chunk.data, chunk.data_size)) {
+		m.target.file_chunk_index++;
+	}
 out:
 	sem_post(next_chunk);
 }
@@ -118,13 +121,16 @@ static bool ota_run(void *handle, const ota_protocol_t *protocol,
 	bool rc = false;
 
 	if (sem_init(&next_chunk, 0, 0) != 0) {
-		return rc;
+		return false;
+	}
+	if ((m.dfu = dfu_new()) == NULL) {
+		return false;
 	}
 	if (!protocol->prepare(handle, file_chunk_arrived, &next_chunk)) {
-		return rc;
+		return false;
 	}
 	if (!send_request(handle, protocol, parser)) {
-		return rc;
+		return false;
 	}
 
 	unsigned int tout = timeout_set(OTA_TIMEOUT_SEC * 1000U);
@@ -133,10 +139,14 @@ static bool ota_run(void *handle, const ota_protocol_t *protocol,
 			error("timed out");
 		}
 		if (is_ota_done()) {
-			// validate
-			// reboot
-			info("OTA done");
-			rc = true;
+			rc = dfu_validate(m.dfu);
+			if (rc) {
+				rc = dfu_register(m.dfu);
+			} else {
+				error("invalid image");
+			}
+			rc = dfu_register(m.dfu);
+			info("DFU #%d %s", dfu_count(), rc? "requested":"failed");
 			break;
 		}
 		if (!proceed_next(handle, protocol, parser)) {
@@ -154,9 +164,11 @@ static bool ota_run(void *handle, const ota_protocol_t *protocol,
 
 static void ota_task(void *context)
 {
-	if (!ota_run(context, m.protocol.ops, m.parser)) {
-		report_failure(context, m.protocol.ops, m.parser);
+	if (ota_run(context, m.protocol.ops, m.parser)) {
+		system_reboot();
 	}
+
+	report_failure(context, m.protocol.ops, m.parser);
 
 	pthread_mutex_lock(&m.lock);
 	{
@@ -176,8 +188,8 @@ void ota_start(void *context, const void *msg, size_t msgsize)
 	}
 
 	if (strcmp(version, target.version) == 0) {
-		warn("same version requested: %s", version);
-		report_failure(context, m.protocol.ops, m.parser);
+		dfu_finish();
+		info("%s. %d/%d", version, dfu_count_error(), dfu_count());
 		return;
 	}
 

@@ -7,6 +7,8 @@
 #include "ota/ota.h"
 #include "ota/protocol/mqtt.h"
 #include "ota/format/json.h"
+#include "dfu.h"
+#include "dfu_flash.h"
 
 extern void system_print_tasks_info(void);
 void application(void);
@@ -27,11 +29,16 @@ void application(void)
 	static uint8_t logbuf[1024];
 	logging_init(memory_storage_init(logbuf, sizeof(logbuf)));
 
+	info("%s rebooting from %s", def2str(VERSION_TAG),
+			system_get_reboot_reason_string());
+
 	bool initialized = jobpool_init();
 	assert(initialized == true);
 
 	reporter_t *reporter = reporter_new(system_get_serial_number_string());
 	assert(reporter != NULL);
+
+	dfu_init(dfu_flash());
 	ota_init(reporter, ota_mqtt(), ota_json_parser());
 
 	while (1) {

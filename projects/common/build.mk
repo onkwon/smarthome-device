@@ -53,10 +53,10 @@ LIBS += -lc_nano
 all:: $(OUTBIN) $(OUTELF).sym $(OUTELF).dump $(OUTELF).lst $(OUTELF).size \
 	$(OUTDIR)/sources.txt $(OUTDIR)/includes.txt
 	$(info done $(VERSION))
-	@awk -P '/^ram/||/^.data/||/^.bss/ {printf("%10d", $$3)}' \
+	@awk -P '/^ram/||/^ram_noinit/||/^.data/||/^.bss/ {printf("%10d", $$3)}' \
 		$(OUTELF).map | LC_ALL=en_US.UTF-8 \
 		awk '{printf("RAM %\04710d / %\04710d (%.2f%%)\n", \
-		$$2 + $$3, $$1, ($$2+$$3)/$$1*100)}'
+		$$3 + $$4, $$1 + $$2, ($$3+$$4)/($$1+$$2)*100)}'
 	@awk -P '/^rom/||/^.text/ {printf("%10d", $$3)}' \
 		$(OUTELF).map | LC_ALL=en_US.UTF-8 \
 		awk '{printf("ROM %\04710d / %\04710d (%.2f%%)\n", \
@@ -89,7 +89,7 @@ $(OUTBIN): $(OUTELF)
 	$(Q)$(SZ) $<
 	$(Q)$(OC) -O binary $< $@
 
-$(OUTELF): $(OBJS) | prerequisite
+$(OUTELF):: $(OBJS)
 	$(info linking     $@)
 	$(Q)$(SZ) -t --common $(sort $(OBJS))
 	$(Q)$(CC) -o $@ -Wl,-Map,$(OUTELF).map $^ \
@@ -110,9 +110,6 @@ ifneq ($(MAKECMDGOALS), depend)
 -include $(DEPS)
 endif
 endif
-
-.PHONY: prerequisite
-prerequisite::
 
 .PHONY: clean
 clean:

@@ -1,1 +1,1 @@
-app_main = 0x402A6010;
+app_init = 0x402A7000;
