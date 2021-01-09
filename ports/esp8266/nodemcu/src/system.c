@@ -50,6 +50,7 @@ const char *system_get_reboot_reason_string(void)
 
 void system_reboot(void)
 {
+	vTaskDelay(1);
 	esp_restart();
 	while (1);
 }
