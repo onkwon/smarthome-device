@@ -41,6 +41,15 @@ EXTERNAL_INCS += \
 	$(PLATFORM_DIR) \
 	.
 
+APPLOADER := $(OUTDIR)/apploader
+APPLOADER_SRCS := \
+	ports/esp8266/nodemcu/src/dfu_flash.c \
+	ports/esp8266/nodemcu/src/sha256.c \
+	src/dfu/dfu.c \
+	apploader/main.c
+APPLOADER_OBJS := $(addprefix $(APPLOADER)/, $(APPLOADER_SRCS:.c=.o))
+DEPS += $(APPLOADER_OBJS:.o=.d)
+
 all:: $(OUTELF).img
 
 $(OUTELF).img: $(OUTBIN)
@@ -57,7 +66,7 @@ $(OUTELF).img: $(OUTBIN)
 		| xxd -r -p >> $@
 	$(Q)cat $< >> $@
 
-$(OUTELF):: $(OUTDIR)/$(PLATFORM).bin $(OUTDIR)/apploader.bin
+$(OUTELF):: $(OUTDIR)/$(PLATFORM).bin $(APPLOADER).bin
 
 $(OUTDIR)/$(PLATFORM).bin: $(OUTDIR)/$(PLATFORM).elf $(MAKEFILE_LIST) \
 				$(PLATFORM_DIR)/loader.sym \
@@ -138,22 +147,28 @@ $(OUTDIR)/$(PLATFORM).elf: $(PLATFORM_DIR)/loader.sym
 		EXTRA_LDFLAGS=-Wl,--just-symbols=loader.sym \
 		PLATFORM_PROJECT_NAME=$(PLATFORM) 1> /dev/null
 
-$(OUTDIR)/apploader.bin: $(OUTDIR)/apploader.elf
+$(APPLOADER).bin: $(APPLOADER).elf
 	$(info generating  $@)
 	$(Q)$(SZ) $<
 	$(Q)$(OC) -O binary $< $@
-$(OUTDIR)/apploader.elf: apploader/main.c src/dfu/dfu.c \
-				ports/esp8266/nodemcu/src/dfu_flash.c \
-				ports/esp8266/nodemcu/src/sha256.c \
+$(APPLOADER).elf: $(APPLOADER_OBJS) \
 				$(OUTDIR)/$(PLATFORM).bin \
 				$(PLATFORM_DIR)/loader.ld \
 				$(PLATFORM_DIR)/app.sym
-	$(info compiling   $(filter %.c,$^))
-	$(Q)$(CC) -o $@ $(filter %.c,$^) \
+	$(info linking     $@)
+	$(Q)$(SZ) -t --common $(sort $(APPLOADER_OBJS))
+	$(Q)$(CC) -o $@ $(filter %.o,$^) \
+		-Wl,-Map,$(APPLOADER).map \
 		-Wl,--just-symbols=$(PLATFORM_DIR)/app.sym \
 		-Wl,--just-symbols=$(OUTDIR)/$(PLATFORM).elf \
 		-T $(PLATFORM_DIR)/loader.ld \
-		$(addprefix -D, $(DEFS)) $(addprefix -I, $(INCS)) \
+		$(LDFLAGS)
+$(APPLOADER_OBJS): $(APPLOADER)/%.o: %.c
+	$(info compiling   $<)
+	@mkdir -p $(@D)
+	$(Q)$(CC) -o $@ -c $*.c -MMD \
+		$(addprefix -D, $(DEFS)) \
+		$(addprefix -I, $(INCS)) \
 		$(CFLAGS)
 
 .PHONY: flash

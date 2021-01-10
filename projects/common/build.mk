@@ -89,15 +89,16 @@ $(OUTBIN): $(OUTELF)
 	$(Q)$(SZ) $<
 	$(Q)$(OC) -O binary $< $@
 
-$(OUTELF):: $(OBJS)
+$(OUTELF):: $(OBJS) $(LD_SCRIPT)
 	$(info linking     $@)
 	$(Q)$(SZ) -t --common $(sort $(OBJS))
-	$(Q)$(CC) -o $@ -Wl,-Map,$(OUTELF).map $^ \
+	$(Q)$(CC) -o $@ $(OBJS) \
+		-Wl,-Map,$(OUTELF).map \
 		$(addprefix -T, $(LD_SCRIPT)) \
-		$(CFLAGS) $(LDFLAGS) \
+		$(LDFLAGS) \
 		$(LIBS)
 
-$(OBJS): $(OUTDIR)/%.o: %.c Makefile $(MAKEFILE_LIST) $(LD_SCRIPT)
+$(OBJS): $(OUTDIR)/%.o: %.c Makefile $(MAKEFILE_LIST)
 	$(info compiling   $<)
 	@mkdir -p $(@D)
 	$(Q)$(CC) -o $@ -c $*.c -MMD \
