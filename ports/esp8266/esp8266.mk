@@ -110,6 +110,7 @@ $(OUTDIR)/$(PLATFORM).bin: $(OUTDIR)/$(PLATFORM).elf $(MAKEFILE_LIST) \
 		-L$(OUTDIR)/esp_http_server -lesp_http_server \
 		-u httpd_start -u httpd_register_uri_handler \
 		-u httpd_resp_send_500 -u httpd_query_key_value \
+		-u httpd_req_to_sockfd \
 		-L$(OUTDIR)/mdns -lmdns \
 		-u mdns_init -u mdns_hostname_set -u mdns_instance_name_set \
 		-u mdns_service_add -u mdns_service_txt_item_set \
