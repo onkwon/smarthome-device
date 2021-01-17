@@ -17,14 +17,11 @@
 #include "wifi.h"
 #include "mqtt.h"
 
-#define TEST_WIFI_SSID				""
-#define TEST_WIFI_PASS				""
-
 #define DEFAULT_MQTT_BROKER_ENDPOINT		""
 
-extern const uint8_t x509_ca_cert[] asm("_binary_ca_crt_start");
-extern const uint8_t x509_device_cert[] asm("_binary_device_crt_start");
-extern const uint8_t x509_device_key[] asm("_binary_device_key_start");
+#if !defined(DEFAULT_HOSTNAME)
+#define DEFAULT_HOSTNAME			"smarthome"
+#endif
 
 const char *TOPICS[TOPIC_MAX];
 
@@ -33,11 +30,31 @@ static struct {
 	mqtt_t *mqtt;
 } m;
 
+static bool connect_to_network(void)
+{
+	uint8_t n = WIFIMAN_MAX_NETWORK_PROFILES;
+
+	for (uint8_t i = 0; i < n; i++) {
+		uint8_t buf[sizeof(wifiman_network_profile_t)
+			+ WIFIMAN_PASS_MAXLEN] = { 0, };
+		wifiman_network_profile_t *profile = (void *)buf;
+
+		if (!wifiman_get_network(profile, i)) {
+			continue;
+		}
+
+		info("connecting to %s", profile->ssid);
+
+		if (wifiman_connect(profile) == WIFIMAN_SUCCESS) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static void wifi_reconnect(void LIBMCU_UNUSED *context)
 {
-	static const char *ssid = TEST_WIFI_SSID;
-	static const char *pass = TEST_WIFI_PASS;
-
 	retry_t retry = {
 		.max_attempts = 10,
 		.max_backoff_ms = 3600000,
@@ -46,9 +63,7 @@ static void wifi_reconnect(void LIBMCU_UNUSED *context)
 		.sleep = sleep_ms,
 	};
 	do {
-		wifiman_network_profile_t profile = { 0, };
-		strncpy(profile.ssid, ssid, WIFIMAN_SSID_MAXLEN);
-		if (wifiman_connect(&profile, pass) == WIFIMAN_SUCCESS) {
+		if (connect_to_network()) {
 			m.reconnecting = false;
 			return;
 		}
@@ -77,22 +92,32 @@ static bool network_interface_init(void)
 	if (!wifiman_on()) {
 		return false;
 	}
+	if (!wifiman_start_station()) {
+		goto out_err_wifi;
+	}
+	if (!wifiman_set_hostname(DEFAULT_HOSTNAME)) {
+		goto out_err_wifi_station;
+	}
 	if (wifiman_register_event_handler(WIFIMAN_EVENT_CONNECTED,
 				wifi_state_change_event) != WIFIMAN_SUCCESS) {
-		return false;
+		goto out_err_wifi_station;
 	}
 	if (wifiman_register_event_handler(WIFIMAN_EVENT_DISCONNECTED,
 				wifi_state_change_event) != WIFIMAN_SUCCESS) {
-		return false;
+		goto out_err_wifi_station;
 	}
-	// TODO: support mutiple APs
-	if (wifiman_connect(&(const wifiman_network_profile_t) {
-				.ssid = TEST_WIFI_SSID, }, TEST_WIFI_PASS)
-			!= WIFIMAN_SUCCESS) {
-		return false;
+	if (!connect_to_network()) {
+		goto out_err_wifi_station;
 	}
 
 	return true;
+
+out_err_wifi_station:
+	wifiman_stop_station();
+out_err_wifi:
+	wifiman_off();
+
+	return false;
 }
 
 static const char *get_topic_path_allocated(bool subscribe,
@@ -249,6 +274,11 @@ bool reporter_collect(const void *data, size_t data_size)
 bool reporter_start(void)
 {
 	return false;
+}
+
+bool reporter_is_enabled(void)
+{
+	return wifiman_count_networks() != 0;
 }
 
 reporter_t *reporter_new(const char *reporter_name)

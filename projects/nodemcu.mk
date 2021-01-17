@@ -1,203 +1,47 @@
-SRCDIRS += ports/esp8266/nodemcu/src
-PLATFORM := esp8266
-PLATFORM_DIR := ports/esp8266/nodemcu/platform
-PLATFORM_SDK_DIR := external/ESP8266_RTOS_SDK
+PLATFORM_DIR := ports/esp8266
+BOARD_DIR := $(PLATFORM_DIR)/nodemcu
+PREREQUISITES += $(OUTDIR)/include/sdkconfig.h
 
-CROSS_COMPILE ?= xtensa-lx106-elf
-CFLAGS += -mlongcalls -mtext-section-literals
-LDFLAGS += -nostartfiles -Wl,--just-symbols=$(OUTDIR)/$(PLATFORM).elf
-LD_SCRIPT += $(PLATFORM_DIR)/app.ld
-DEFS += __ESP_FILE__=\"null\"
+OUTPUT := $(OUTDIR)/mybin
 
-## Compiler errors
-CFLAGS += \
-	  -Wno-error=cast-qual \
-	  -Wno-error=sign-conversion \
-	  -Wno-error=redundant-decls \
-	  -Wno-error=strict-prototypes \
-	  -Wno-error=undef
+include ports/esp8266/esp8266.mk
 
-EXTERNAL_INCS += \
-	$(PLATFORM_SDK_DIR)/components/mqtt/esp-mqtt/include \
-	$(PLATFORM_SDK_DIR)/components/esp_common/include \
-	$(PLATFORM_SDK_DIR)/components/esp_event/include \
-	$(PLATFORM_SDK_DIR)/components/freertos/include \
-	$(PLATFORM_SDK_DIR)/components/freertos/port/esp8266/include \
-	$(PLATFORM_SDK_DIR)/components/freertos/port/esp8266/include/freertos \
-	$(PLATFORM_SDK_DIR)/components/freertos/include/freertos/private \
-	$(PLATFORM_SDK_DIR)/components/esp8266/include \
-	$(PLATFORM_SDK_DIR)/components/heap/include \
-	$(PLATFORM_SDK_DIR)/components/heap/port/esp8266/include \
-	$(PLATFORM_SDK_DIR)/components/tcpip_adapter/include \
-	$(PLATFORM_SDK_DIR)/components/lwip/lwip/src/include \
-	$(PLATFORM_SDK_DIR)/components/lwip/port/esp8266/include \
-	$(PLATFORM_SDK_DIR)/components/vfs/include \
-	$(PLATFORM_SDK_DIR)/components/lwip/include/apps/sntp \
-	$(PLATFORM_SDK_DIR)/components/lwip/include/apps \
-	$(PLATFORM_SDK_DIR)/components/app_update/include \
-	$(PLATFORM_SDK_DIR)/components/spi_flash/include \
-	$(PLATFORM_SDK_DIR)/components/bootloader_support/include \
-	$(PLATFORM_SDK_DIR)/components/nvs_flash/include \
-	$(PLATFORM_DIR) \
-	.
-
-APPLOADER := $(OUTDIR)/apploader
-APPLOADER_SRCS := \
-	ports/esp8266/nodemcu/src/dfu_flash.c \
-	ports/esp8266/nodemcu/src/sha256.c \
-	src/dfu/dfu.c \
-	apploader/main.c
-APPLOADER_OBJS := $(addprefix $(APPLOADER)/, $(APPLOADER_SRCS:.c=.o))
-DEPS += $(APPLOADER_OBJS:.o=.d)
-
-all:: $(OUTELF).img
-
-$(OUTELF).img: $(OUTBIN)
-	$(info generating  $@)
-	$(Q)printf "C0DEFEED" \
-		| tools/endian.sh \
-		| xxd -r -p > $@
-	$(Q)wc -c < $< \
-		| awk '{printf("%08x", $$1)}' \
-		| tools/endian.sh \
-		| xxd -r -p >> $@
-	$(Q)openssl dgst -sha256 $(OUTBIN) \
-		| awk '{print $$2}' \
-		| xxd -r -p >> $@
-	$(Q)cat $< >> $@
-
-$(OUTELF):: $(OUTDIR)/$(PLATFORM).bin $(APPLOADER).bin
-
-$(OUTDIR)/$(PLATFORM).bin: $(OUTDIR)/$(PLATFORM).elf $(MAKEFILE_LIST) \
-				$(PLATFORM_DIR)/loader.sym \
-				$(PLATFORM_DIR)/sdk.ld
-	$(info rewriting   $<)
-	$(Q)$(CC) \
-		-Wl,--just-symbols=$(PLATFORM_DIR)/loader.sym \
-		-nostdlib -Wl,-static -Wl,--gc-sections \
-		-u call_user_start_cpu0 -u esp_app_desc -u vsnprintf \
-		-Wl,--start-group \
-		-L$(OUTDIR)/esp-tls -lesp-tls  \
-		-L$(OUTDIR)/esp8266 -lesp8266 \
-		-L$(BASEDIR)/external/ESP8266_RTOS_SDK/components/esp8266/lib \
-		-lhal -lcore -lnet80211 -lphy  -lclk -lpp -lespnow \
-		-L$(BASEDIR)/external/ESP8266_RTOS_SDK/components/esp8266/ld \
-		-T $(PLATFORM_DIR)/sdk.ld \
-		-T $(OUTDIR)/esp8266/esp8266.project.ld \
-		-T esp8266.rom.ld \
-		-T esp8266.peripherals.ld \
-		-Wl,--no-check-sections -u call_user_start -u g_esp_sys_info \
-		-L$(OUTDIR)/esp_common -lesp_common \
-		-u esp_reset_reason -u esp_get_free_heap_size \
-		-L$(OUTDIR)/esp_event -lesp_event  \
-		-u esp_event_loop_create_default -u esp_event_send \
-		-L$(OUTDIR)/esp_ringbuf -lesp_ringbuf  \
-		-L$(OUTDIR)/freertos -lfreertos \
-		-u vTaskDelay -u vTaskList -u uxTaskGetNumberOfTasks \
-		-L$(OUTDIR)/heap -lheap \
-		-L$(OUTDIR)/http_parser -lhttp_parser \
-		-L$(OUTDIR)/log -llog \
-		-L$(OUTDIR)/lwip -llwip \
-		-L$(OUTDIR)/mbedtls -lmbedtls  \
-		-L$(OUTDIR)/mqtt -lmqtt \
-		-u esp_mqtt_client_subscribe \
-		-u esp_mqtt_client_unsubscribe \
-		-u esp_mqtt_client_publish \
-		-u esp_mqtt_client_init \
-		-u esp_mqtt_client_register_event \
-		-u esp_mqtt_client_destroy \
-		-u esp_mqtt_client_start \
-		-L$(OUTDIR)/newlib -lnewlib \
-		-lc_nano -u __errno \
-		-L$(OUTDIR)/nvs_flash -lnvs_flash \
-		-L$(OUTDIR)/pthread -lpthread \
-		-u pthread_include_pthread_impl \
-		-u pthread_include_pthread_cond_impl \
-		-u pthread_include_pthread_local_storage_impl \
-		-u pthread_attr_init -u pthread_exit -u pthread_create \
-		-u pthread_attr_setstacksize -u pthread_attr_setdetachstate \
-		-L$(OUTDIR)/spi_flash -lspi_flash \
-		-u spi_flash_erase_range \
-		-L$(OUTDIR)/tcp_transport -ltcp_transport \
-		-L$(OUTDIR)/tcpip_adapter -ltcpip_adapter \
-		-u tcpip_adapter_init \
-		-u ip4addr_ntoa \
-		-L$(OUTDIR)/vfs -lvfs \
-		-L$(OUTDIR)/wpa_supplicant -lwpa_supplicant \
-		-u esp_wifi_init -u esp_wifi_set_storage -u esp_wifi_set_mode \
-		-u esp_wifi_start -u esp_wifi_scan_start -u esp_wifi_set_config \
-		-u esp_wifi_sta_get_ap_info -u esp_wifi_connect \
-		-u esp_wifi_scan_get_ap_records \
-		-u esp_restart \
-		-lgcc -lstdc++ -Wl,--end-group -Wl,-EL \
-		-o $(OUTDIR)/$(PLATFORM).elf \
-		-Wl,-Map=$(OUTDIR)/$(PLATFORM).map \
-		-Wl,--print-memory-usage
-	$(info generating  $@)
-	$(Q)python $(PLATFORM_SDK_DIR)/components/esptool_py/esptool/esptool.py \
-		--chip esp8266 elf2image \
-		--version=3 \
-		-o $@ $< 1>/dev/null
-
-.PHONY: $(OUTDIR)/$(PLATFORM).elf
-$(OUTDIR)/$(PLATFORM).elf: $(PLATFORM_DIR)/loader.sym
-	$(info generating  $@ (this may take a while...))
-	$(Q)$(MAKE) -C $(PLATFORM_DIR) $(MAKEFLAGS) \
-		PLATFORM_BUILD_DIR=$(BASEDIR)/$(OUTDIR) \
-		EXTRA_LDFLAGS=-Wl,--just-symbols=loader.sym \
-		PLATFORM_PROJECT_NAME=$(PLATFORM) 1> /dev/null
-
-$(APPLOADER).bin: $(APPLOADER).elf
-	$(info generating  $@)
-	$(Q)$(SZ) $<
-	$(Q)$(OC) -O binary $< $@
-$(APPLOADER).elf: $(APPLOADER_OBJS) \
-				$(OUTDIR)/$(PLATFORM).bin \
-				$(PLATFORM_DIR)/loader.ld \
-				$(PLATFORM_DIR)/app.sym
+$(OUTPUT): $(OUTLIB)
 	$(info linking     $@)
-	$(Q)$(SZ) -t --common $(sort $(APPLOADER_OBJS))
-	$(Q)$(CC) -o $@ $(filter %.o,$^) \
-		-Wl,-Map,$(APPLOADER).map \
-		-Wl,--just-symbols=$(PLATFORM_DIR)/app.sym \
-		-Wl,--just-symbols=$(OUTDIR)/$(PLATFORM).elf \
-		-T $(PLATFORM_DIR)/loader.ld \
-		$(LDFLAGS)
-$(APPLOADER_OBJS): $(APPLOADER)/%.o: %.c
-	$(info compiling   $<)
-	@mkdir -p $(@D)
-	$(Q)$(CC) -o $@ -c $*.c -MMD \
-		$(addprefix -D, $(DEFS)) \
-		$(addprefix -I, $(INCS)) \
-		$(CFLAGS)
+	$(Q)$(MAKE) -C $(BOARD_DIR)/platform $(MAKEFLAGS) \
+		PLATFORM_BUILD_DIR=$(BASEDIR)/$(OUTDIR) \
+		PLATFORM_PROJECT_NAME=$(notdir $@) 1> /dev/null
+$(OUTDIR)/include/sdkconfig.h:
+	$(info generating  $@ (this may take a while...))
+	-$(Q)$(MAKE) -C $(BOARD_DIR)/platform $(MAKEFLAGS) \
+		PLATFORM_BUILD_DIR=$(BASEDIR)/$(OUTDIR) \
+		PLATFORM_PROJECT_NAME=$(notdir $@) 1> /dev/null
 
 .PHONY: flash
 flash: all
 	python $(PLATFORM_SDK_DIR)/components/esptool_py/esptool/esptool.py \
 		--chip esp8266 \
-		--port /dev/tty.SLAB_USBtoUART \
+		--port $(PORT) \
 		--baud 921600 \
 		--before default_reset \
 		--after hard_reset write_flash -z \
 		--flash_mode dio \
 		--flash_freq 40m \
 		--flash_size 4MB \
-		0xe000 $(OUTDIR)/ota_data_initial.bin \
 		0x0 $(OUTDIR)/bootloader/bootloader.bin \
-		0x10000 $(OUTDIR)/esp8266.bin \
 		0x8000 $(OUTDIR)/partitions.bin \
-		0xA5000 $(OUTDIR)/apploader.bin \
-		0xA7000 $(OUTDIR)/nodemcu.bin
+		0xd000 $(OUTDIR)/ota_data_initial.bin \
+		0x10000 $(OUTPUT).bin
 .PHONY: erase_flash
 erase_flash:
 	python $(PLATFORM_SDK_DIR)/components/esptool_py/esptool/esptool.py \
 		--chip esp8266 \
-		--port /dev/tty.SLAB_USBtoUART \
+		--port $(PORT) \
 		--baud 921600 \
 		--before default_reset \
 		$@
 .PHONY: monitor
 monitor:
-	$(PLATFORM_SDK_DIR)/tools/idf_monitor.py $(OUTELF) \
-		--port /dev/tty.SLAB_USBtoUART
-	#python -m serial.tools.miniterm /dev/tty.SLAB_USBtoUART 115200
+	$(PLATFORM_SDK_DIR)/tools/idf_monitor.py $(OUTPUT).elf \
+		--port $(PORT)
+	#python -m serial.tools.miniterm $(PORT) 115200

@@ -1,17 +1,25 @@
 #include <assert.h>
+
 #include "libmcu/logging.h"
 #include "libmcu/system.h"
+#include "libmcu/pubsub.h"
+
 #include "sleep.h"
 #include "jobpool.h"
-#include "reporter.h"
-#include "ota/ota.h"
-#include "ota/protocol/mqtt.h"
-#include "ota/format/json.h"
+
 #include "dfu/dfu.h"
 #include "dfu/flash.h"
 
+#include "ota/ota.h"
+#include "ota/protocol/mqtt.h"
+#include "ota/format/json.h"
+
+#include "provisioning.h"
+#include "reporter.h"
+
 extern void system_print_tasks_info(void);
-void application(void);
+extern void mdns_test(void);
+extern void sntp_test(void);
 
 #include <stdio.h>
 #include "memory_storage.h"
@@ -24,16 +32,26 @@ void memory_storage_write_hook(const void *data, size_t size)
 	puts("\n");
 }
 
-void application(void)
+int main(void)
 {
 	static uint8_t logbuf[1024];
 	logging_init(memory_storage_init(logbuf, sizeof(logbuf)));
+	pubsub_init();
+
+	bool initialized = jobpool_init();
+	assert(initialized == true);
+
+	//mdns_test();
+	sntp_test();
 
 	info("%s rebooting from %s", def2str(VERSION_TAG),
 			system_get_reboot_reason_string());
 
-	bool initialized = jobpool_init();
-	assert(initialized == true);
+	if (!reporter_is_enabled()) {
+		if (provisioning_start()) {
+			system_reboot();
+		}
+	}
 
 	reporter_t *reporter = reporter_new(system_get_serial_number_string());
 	assert(reporter != NULL);

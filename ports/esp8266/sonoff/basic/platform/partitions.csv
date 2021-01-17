@@ -1,0 +1,5 @@
+# Name  ,  Type , SubType,  Offset ,   Size  ,
+nvs     ,   data, nvs    ,   0x9000,   0x5000,
+otadata ,   data, ota    ,   0xe000,   0x2000,
+sdk     ,    app, ota_0  ,  0x10000,  0xAD000,
+app     ,    app, ota_1  ,  0xBE000,     264K,

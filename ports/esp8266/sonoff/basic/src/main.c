@@ -14,7 +14,7 @@ extern uintptr_t __app_text_end;
 extern uintptr_t __app_bss_start;
 extern uintptr_t __app_bss_end;
 
-extern void application(void);
+extern int main(void);
 
 void _app_init(void);
 void app_start(void);
@@ -29,7 +29,7 @@ static void esp_init(void)
 static void app_wrapper(void *e)
 {
 	(void)e;
-	application();
+	main();
 	vTaskDelete(NULL);
 }
 

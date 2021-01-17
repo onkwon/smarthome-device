@@ -7,9 +7,13 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
+
+#define WIFIMAN_MAX_NETWORK_PROFILES		8
 
 #define WIFIMAN_BSSID_MAXLEN			6
 #define WIFIMAN_SSID_MAXLEN			32
+#define WIFIMAN_PASS_MAXLEN			64
 #define WIFIMAN_IP4_MAXLEN			4
 #define WIFIMAN_MAC_MAXLEN			6
 
@@ -53,6 +57,7 @@ typedef struct {
 	char ssid[WIFIMAN_SSID_MAXLEN + 1];
 	uint8_t channel;
 	int8_t rssi;
+	char password[];
 } wifiman_network_profile_t;
 
 typedef void (*wifiman_event_handler_t)(wifiman_event_t event, void *context);
@@ -61,8 +66,14 @@ bool wifiman_on(void);
 void wifiman_off(void);
 bool wifiman_reset(void);
 
-wifiman_error_t wifiman_connect(const wifiman_network_profile_t *conf,
-		const char *pass);
+bool wifiman_start_station(void);
+bool wifiman_stop_station(void);
+
+bool wifiman_start_ap(void);
+bool wifiman_stop_ap(void);
+// wifiman_configure_ap()
+
+wifiman_error_t wifiman_connect(const wifiman_network_profile_t *info);
 wifiman_error_t wifiman_disconnect(void);
 bool wifiman_is_connected(void);
 bool wifiman_get_ip(uint8_t ip[WIFIMAN_IP4_MAXLEN]);
@@ -74,6 +85,15 @@ int wifiman_scan(wifiman_network_profile_t *scanlist, int maxlen);
 wifiman_error_t wifiman_register_event_handler(wifiman_event_t event,
 		wifiman_event_handler_t handler);
 
+bool wifiman_set_hostname(const char *hostname);
+bool wifiman_get_hostname(const char **hostname);
+
+size_t wifiman_count_networks(void);
+bool wifiman_save_network(const wifiman_network_profile_t *profile);
+bool wifiman_get_network(wifiman_network_profile_t *profile, uint8_t index);
+bool wifiman_delete_network(const wifiman_network_profile_t *profile);
+bool wifiman_clear_networks(void);
+
 #if 0 // TODO: implement
 	set_mac()
 
@@ -82,10 +102,6 @@ wifiman_error_t wifiman_register_event_handler(wifiman_event_t event,
 
 	get_country()
 	set_country()
-
-	start_ap()
-	stop_ap()
-	congifure_ap()
 
 	ping(ip, interval_ms, count)
 

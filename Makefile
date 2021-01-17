@@ -33,3 +33,6 @@ coverage:
 cleanall:
 	#$(Q)$(MAKE) -C tests clean
 	$(Q)rm -rf $(BUILDIR)
+
+PORT ?= /dev/tty.SLAB_USBtoUART
+export PORT

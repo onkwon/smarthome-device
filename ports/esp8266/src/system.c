@@ -55,12 +55,12 @@ void system_reboot(void)
 	while (1);
 }
 
-unsigned long system_get_free_heap_bytes(void)
+unsigned int system_get_free_heap_bytes(void)
 {
 	return esp_get_free_heap_size();
 }
 
-unsigned long system_get_current_stack_watermark(void)
+unsigned int system_get_current_stack_watermark(void)
 {
 	return uxTaskGetStackHighWaterMark(NULL);
 }

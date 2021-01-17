@@ -2,7 +2,10 @@ goal := $(firstword $(MAKECMDGOALS))
 
 ifneq ($(goal),)
 ifneq ($(strip $(wildcard projects/$(goal).mk)),)
-$(MAKECMDGOALS):
+$(MAKECMDGOALS): build-goal
+	@:
+.PHONY: build-goal
+build-goal:
 	$(Q)PROJECT=$(goal) $(MAKE) -f projects/common/build.mk \
 		$(filter-out $(goal), $(MAKECMDGOALS))
 done := 1
@@ -19,45 +22,51 @@ endif
 OUTDIR := $(BUILDIR)/$(PROJECT)
 OUTELF := $(OUTDIR)/$(PROJECT)
 OUTBIN := $(OUTDIR)/$(PROJECT).bin
+OUTLIB := $(OUTDIR)/lib$(PROJECT).a
 
 -include projects/$(PROJECT).mk
 include projects/common/toolchain.mk
 
-SRCDIRS += src
-EXTERNAL_SRCS += \
+COMPONENTS_DIRS += components/httpsrv
+COMPONENTS_INCS += components/httpsrv/include
+
+SRCDIRS += src $(COMPONENTS_DIRS)
+
+EXTRA_SRCS += \
+	external/libmcu/src/pubsub.c \
 	external/libmcu/examples/memory_storage.c \
 	external/libmcu/src/ringbuf.c \
 	external/libmcu/src/retry.c \
 	external/libmcu/src/jobqueue.c \
 	external/libmcu/src/logging.c
-EXTERNAL_INCS += \
+EXTRA_INCS += \
 	external/libmcu/examples \
 	external/libmcu/include \
 	external/libmcu/include/libmcu/posix \
 	external
 
 SRCS += $(foreach dir, $(SRCDIRS), $(shell find $(dir) -type f -regex ".*\.c")) \
-	$(EXTERNAL_SRCS)
+	$(EXTRA_SRCS)
 OBJS += $(addprefix $(OUTDIR)/, $(SRCS:.c=.o))
 DEPS += $(OBJS:.o=.d)
 INCS += \
-	include \
-	$(EXTERNAL_INCS)
+	$(EXTRA_INCS) \
+	$(COMPONENTS_INCS) \
+	include
 DEFS += \
 	_POSIX_THREADS \
 	VERSION_TAG=$(VERSION_TAG) \
 	VERSION=$(VERSION)
-LIBS += -lc_nano
+LIBS +=
 
 .DEFAULT_GOAL :=
-all:: $(OUTBIN) $(OUTELF).sym $(OUTELF).dump $(OUTELF).lst $(OUTELF).size \
-	$(OUTDIR)/sources.txt $(OUTDIR)/includes.txt
+all:: $(OUTPUT)
 	$(info done $(VERSION))
-	@awk -P '/^ram/||/^ram_noinit/||/^.data/||/^.bss/ {printf("%10d", $$3)}' \
+	@#@awk -P '/^ram/||/^ram_noinit/||/^.data/||/^.bss/ {printf("%10d", $$3)}' \
 		$(OUTELF).map | LC_ALL=en_US.UTF-8 \
 		awk '{printf("RAM %\04710d / %\04710d (%.2f%%)\n", \
 		$$3 + $$4, $$1 + $$2, ($$3+$$4)/($$1+$$2)*100)}'
-	@awk -P '/^rom/||/^.text/ {printf("%10d", $$3)}' \
+	@#@awk -P '/^rom/||/^.text/ {printf("%10d", $$3)}' \
 		$(OUTELF).map | LC_ALL=en_US.UTF-8 \
 		awk '{printf("ROM %\04710d / %\04710d (%.2f%%)\n", \
 		$$2, $$1, $$2/$$1*100)}'
@@ -98,7 +107,11 @@ $(OUTELF):: $(OBJS) $(LD_SCRIPT)
 		$(LDFLAGS) \
 		$(LIBS)
 
-$(OBJS): $(OUTDIR)/%.o: %.c Makefile $(MAKEFILE_LIST)
+$(OUTLIB): $(OBJS)
+	$(info archiving   $@)
+	$(Q)$(AR) $(ARFLAGS) $@ $^ 1> /dev/null 2>&1
+
+$(OBJS): $(OUTDIR)/%.o: %.c Makefile $(MAKEFILE_LIST) | $(PREREQUISITES)
 	$(info compiling   $<)
 	@mkdir -p $(@D)
 	$(Q)$(CC) -o $@ -c $*.c -MMD \

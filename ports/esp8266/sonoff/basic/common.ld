@@ -3,8 +3,8 @@ MEMORY
 	ram_noinit(rwx) : ORIGIN = 0x3FFE8000, LENGTH = 0x8
 	ram (rwx)	: ORIGIN = ORIGIN(ram_noinit) + LENGTH(ram_noinit),
 				LENGTH = 4K - LENGTH(ram_noinit)
-	bootopt (rx)	: ORIGIN = 0x402A6000, LENGTH = 4K
-	dfu (rx)	: ORIGIN = 0x402CC000, LENGTH = 148K
+	bootopt (rx)	: ORIGIN = 0x402B0000, LENGTH = 4K
+	dfu (rx)	: ORIGIN = 0x402D1000, LENGTH = 128K
 }
 
 PROVIDE(__bootopt = ORIGIN(bootopt) & 0xFFFFF);

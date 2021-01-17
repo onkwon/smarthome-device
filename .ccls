@@ -3,6 +3,7 @@ clang
 -std=gnu++14
 
 -Iinclude
+-Icomponents/httpsrv/include
 -Iexternal/libmcu/include
 -Iexternal/libmcu/include/libmcu/posix
 -I/usr/local/Cellar/cpputest/4.0/include

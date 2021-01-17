@@ -16,4 +16,6 @@ bool reporter_send_event(const void *data, size_t data_size);
 /* send sensor data periodic in sync with its own interval */
 bool reporter_collect(const void *data, size_t data_size);
 
+bool reporter_is_enabled(void);
+
 #endif /* REPORTER_H */

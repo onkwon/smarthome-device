@@ -10,6 +10,20 @@
 
 #include "libmcu/logging.h"
 #include "libmcu/compiler.h"
+#include "nvs_kvstore.h"
+
+#define WIFI_KVSTORE_NAMESPACE		"wifi"
+#define WIFI_KVSTORE_REGISTRY		"registry"
+
+#if !defined(DEFAULT_WIFI_SSID)
+#define DEFAULT_WIFI_SSID		"smarthome"
+#endif
+#if !defined(DEFAULT_WIFI_PASS)
+#define DEFAULT_WIFI_PASS		"smarthome"
+#endif
+#if !defined(DEFAULT_WIFI_MAX_CONNECTIONS)
+#define DEFAULT_WIFI_MAX_CONNECTIONS	1
+#endif
 
 #define PASSWORD_MAXLEN			63
 
@@ -17,6 +31,13 @@ enum {
 	EVENT_STARTED			= BIT0,
 	EVENT_CONNECTED			= BIT1,
 	EVENT_DISCONNECTED		= BIT2,
+};
+
+struct network_registry {
+	uint8_t count;
+	struct {
+		bool used;
+	} index[WIFIMAN_MAX_NETWORK_PROFILES];
 };
 
 static struct {
@@ -127,8 +148,7 @@ static void event_handler(void *arg, esp_event_base_t event_base,
 	}
 }
 
-static wifiman_error_t connect_internal(const wifiman_network_profile_t *conf,
-		const char *pass)
+static wifiman_error_t connect_internal(const wifiman_network_profile_t *info)
 {
 	if (!m.initialized) {
 		return WIFIMAN_NOT_INITIALIZED;
@@ -150,13 +170,21 @@ static wifiman_error_t connect_internal(const wifiman_network_profile_t *conf,
 	}
 
 	wifi_config_t esp_conf = { 0, };
-	strncpy((char *)esp_conf.sta.ssid, conf->ssid, WIFIMAN_SSID_MAXLEN);
-	strncpy((char *)esp_conf.sta.password, pass, PASSWORD_MAXLEN);
+	strncpy((char *)esp_conf.sta.ssid, info->ssid, WIFIMAN_SSID_MAXLEN);
+	strncpy((char *)esp_conf.sta.password, info->password, PASSWORD_MAXLEN);
+
+	memcpy(esp_conf.sta.bssid, info->bssid, sizeof(esp_conf.sta.bssid));
+	if (info->bssid[0] != 0 && info->bssid[1] != 0 &&
+			info->bssid[2] != 0 && info->bssid[3] != 0 &&
+			info->bssid[4] != 0 && info->bssid[5] != 0) {
+		esp_conf.sta.bssid_set = true;
+	}
+
 	if (esp_wifi_set_config(ESP_IF_WIFI_STA, &esp_conf) != ESP_OK) {
 		return WIFIMAN_WRONG_SETTINGS;
 	}
 
-	memcpy(&m.ap, conf, sizeof(m.ap)); // keep the conncted ap information
+	memcpy(&m.ap, info, sizeof(m.ap)); // keep the conncted ap information
 	esp_wifi_connect();
 	xEventGroupWaitBits(m.event, EVENT_CONNECTED | EVENT_DISCONNECTED,
 					pdTRUE, pdFALSE, portMAX_DELAY);
@@ -204,19 +232,11 @@ static bool turn_wifi_on_internal(void)
 				&event_handler, NULL) != ESP_OK) {
 		return false;
 	}
-	if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK) {
-		return false;
-	}
-	if (esp_wifi_start() != ESP_OK) {
-		return false;
-	}
 	return true;
 }
 
 static void turn_wifi_off_internal(void)
 {
-	disconnect_internal();
-	esp_wifi_stop();
 	esp_wifi_deinit();
 }
 
@@ -272,18 +292,106 @@ bool wifiman_reset(void)
 	return rc;
 }
 
-wifiman_error_t wifiman_connect(const wifiman_network_profile_t *conf,
-		const char *pass)
+bool wifiman_start_station(void)
 {
-	if (conf == NULL) {
-		return WIFIMAN_INVALID_PARAM;
+	if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK) {
+		return false;
 	}
-	if (pass == NULL && conf->security != WIFIMAN_SECURITY_OPEN) {
+	if (esp_wifi_start() != ESP_OK) {
+		return false;
+	}
+	return true;
+}
+
+bool wifiman_stop_station(void)
+{
+	disconnect_internal();
+	esp_wifi_stop();
+	return true;
+}
+
+bool wifiman_start_ap(void)
+{
+	wifi_config_t wifi_config = {
+		.ap = {
+			.ssid = DEFAULT_WIFI_SSID,
+			.ssid_len = (uint8_t)strlen(DEFAULT_WIFI_SSID),
+			.password = DEFAULT_WIFI_PASS,
+			.max_connection = DEFAULT_WIFI_MAX_CONNECTIONS,
+			.authmode = WIFI_AUTH_WPA_WPA2_PSK
+		},
+	};
+	if (strlen(DEFAULT_WIFI_PASS) == 0) {
+		wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+	}
+
+	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+	ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
+	ESP_ERROR_CHECK(esp_wifi_start());
+
+	return true;
+}
+
+bool wifiman_stop_ap(void)
+{
+	esp_wifi_stop();
+	return true;
+}
+
+static tcpip_adapter_if_t get_interface_type_from_mode(wifi_mode_t mode)
+{
+	switch (mode) {
+	case WIFI_MODE_STA:
+		return TCPIP_ADAPTER_IF_STA;
+	case WIFI_MODE_AP:
+	case WIFI_MODE_APSTA:
+		return TCPIP_ADAPTER_IF_AP;
+	default:
+		break;
+	}
+	return TCPIP_ADAPTER_IF_MAX;
+}
+
+bool wifiman_set_hostname(const char *hostname)
+{
+	tcpip_adapter_if_t interface;
+	wifi_mode_t mode;
+	if (esp_wifi_get_mode(&mode) != ESP_OK) {
+		return false;
+	}
+	if ((interface = get_interface_type_from_mode(mode))
+			== TCPIP_ADAPTER_IF_MAX) {
+		return false;
+	}
+	return tcpip_adapter_set_hostname(interface, hostname) == ESP_OK;
+}
+
+bool wifiman_get_hostname(const char **hostname)
+{
+	tcpip_adapter_if_t interface;
+	wifi_mode_t mode;
+	if (esp_wifi_get_mode(&mode) != ESP_OK) {
+		return false;
+	}
+	if ((interface = get_interface_type_from_mode(mode))
+			== TCPIP_ADAPTER_IF_MAX) {
+		return false;
+	}
+	return tcpip_adapter_get_hostname(interface, hostname) == ESP_OK;
+}
+
+wifiman_error_t wifiman_connect(const wifiman_network_profile_t *info)
+{
+	if (info == NULL) {
 		return WIFIMAN_INVALID_PARAM;
 	}
 
-	size_t ssid_len = strnlen(conf->ssid, WIFIMAN_SSID_MAXLEN);
-	if (ssid_len == 0 || ssid_len >= WIFIMAN_SSID_MAXLEN) {
+	size_t len = strnlen(info->ssid, WIFIMAN_SSID_MAXLEN);
+	if (len == 0 || len >= WIFIMAN_SSID_MAXLEN) {
+		return WIFIMAN_INVALID_PARAM;
+	}
+	len = strnlen(info->password, WIFIMAN_PASS_MAXLEN);
+	if (len == 0 || len >= WIFIMAN_PASS_MAXLEN) {
 		return WIFIMAN_INVALID_PARAM;
 	}
 
@@ -291,7 +399,7 @@ wifiman_error_t wifiman_connect(const wifiman_network_profile_t *conf,
 
 	pthread_mutex_lock(&m.lock);
 	{
-		rc = connect_internal(conf, pass);
+		rc = connect_internal(info);
 	}
 	pthread_mutex_unlock(&m.lock);
 
@@ -496,4 +604,275 @@ wifiman_error_t wifiman_register_event_handler(wifiman_event_t event,
 	}
 
 	return WIFIMAN_SUCCESS;
+}
+
+static void load_network_registry(kvstore_t *kv,
+		struct network_registry *registry)
+{
+	if (kvstore_read(kv, WIFI_KVSTORE_REGISTRY, registry, sizeof(*registry))
+			!= sizeof(*registry)) {
+		memset(registry, 0, sizeof(*registry));
+	}
+}
+
+static size_t count_saved_networks_internal(void)
+{
+	size_t count = 0;
+
+	kvstore_t *kv = nvs_kvstore_open(WIFI_KVSTORE_NAMESPACE);
+	if (kv == NULL) {
+		error("cannot open %s kvstore", WIFI_KVSTORE_NAMESPACE);
+		return 0;
+	}
+
+	struct network_registry registry;
+	load_network_registry(kv, &registry);
+	count = registry.count;
+
+	nvs_kvstore_close(kv);
+
+	return count;
+}
+
+static uint8_t get_empty_network_slot_index(const struct network_registry *p)
+{
+	for (uint8_t i = 0; i < WIFIMAN_MAX_NETWORK_PROFILES; i++) {
+		if (!p->index[i].used) {
+			return i;
+		}
+	}
+
+	return WIFIMAN_MAX_NETWORK_PROFILES;
+}
+
+static bool update_network_registry(const struct network_registry *registry,
+		kvstore_t *kv)
+{
+	if (kvstore_write(kv, WIFI_KVSTORE_REGISTRY, registry, sizeof(*registry))
+			!= sizeof(*registry)) {
+		return false;
+	}
+	return true;
+}
+
+static bool write_network_profile(const wifiman_network_profile_t *profile,
+		kvstore_t *kv, uint8_t index)
+{
+	char index_string[4] = { 0, };
+	snprintf(index_string, 3, "%u", index);
+
+	size_t len = sizeof(*profile) + strlen(profile->password);
+	if (kvstore_write(kv, index_string, profile, len) != len) {
+		error("cannot write");
+		return false;
+	}
+
+	return true;
+}
+
+static bool read_network_profile(wifiman_network_profile_t *profile,
+		kvstore_t *kv, uint8_t index)
+{
+	char index_string[4] = { 0, };
+	snprintf(index_string, 3, "%u", index);
+
+	size_t len = sizeof(*profile) + WIFIMAN_PASS_MAXLEN;
+	if (kvstore_read(kv, index_string, profile, len) == 0) {
+		error("cannot read");
+		return false;
+	}
+
+	return true;
+}
+
+static bool save_network_internal(const wifiman_network_profile_t *profile)
+{
+	bool rc = false;
+
+	kvstore_t *kv = nvs_kvstore_open(WIFI_KVSTORE_NAMESPACE);
+	if (kv == NULL) {
+		error("cannot open %s kvstore", WIFI_KVSTORE_NAMESPACE);
+		return false;
+	}
+
+	struct network_registry registry;
+	load_network_registry(kv, &registry);
+
+	uint8_t index = get_empty_network_slot_index(&registry);
+
+	if (index >= WIFIMAN_MAX_NETWORK_PROFILES) {
+		error("no space for additional network profile(max: %u).",
+				WIFIMAN_MAX_NETWORK_PROFILES);
+		goto out;
+	}
+
+	if (!write_network_profile(profile, kv, index)) {
+		goto out;
+	}
+
+	registry.index[index].used = true;
+	registry.count = (uint8_t)(registry.count + 1);
+
+	if (!update_network_registry(&registry, kv)) {
+		goto out;
+	}
+
+	rc = true;
+out:
+	nvs_kvstore_close(kv);
+	return rc;
+}
+
+static bool get_network_internal(wifiman_network_profile_t *profile,
+		uint8_t index)
+{
+	struct network_registry registry;
+	bool rc = false;
+
+	kvstore_t *kv = nvs_kvstore_open(WIFI_KVSTORE_NAMESPACE);
+	if (kv == NULL) {
+		error("cannot open %s kvstore", WIFI_KVSTORE_NAMESPACE);
+		return false;
+	}
+
+	load_network_registry(kv, &registry);
+
+	if (!registry.index[index].used) {
+		goto out;
+	}
+	if (!read_network_profile(profile, kv, index)) {
+		goto out;
+	}
+
+	rc = true;
+out:
+	nvs_kvstore_close(kv);
+	return rc;
+}
+
+static bool clear_networks_internal(void)
+{
+	struct network_registry registry = { 0, };
+	bool rc = false;
+
+	kvstore_t *kv = nvs_kvstore_open(WIFI_KVSTORE_NAMESPACE);
+	if (kv == NULL) {
+		error("cannot open %s kvstore", WIFI_KVSTORE_NAMESPACE);
+		return false;
+	}
+
+	if (kvstore_write(kv, WIFI_KVSTORE_REGISTRY, &registry, sizeof(registry))
+			!= sizeof(registry)) {
+		goto out;
+	}
+
+	rc = true;
+out:
+	nvs_kvstore_close(kv);
+	return rc;
+}
+
+static bool delete_network(const wifiman_network_profile_t *profile)
+{
+	struct network_registry registry;
+	bool rc = false;
+
+	kvstore_t *kv = nvs_kvstore_open(WIFI_KVSTORE_NAMESPACE);
+	if (kv == NULL) {
+		error("cannot open %s kvstore", WIFI_KVSTORE_NAMESPACE);
+		return false;
+	}
+
+	load_network_registry(kv, &registry);
+
+	for (uint8_t i = 0; i < WIFIMAN_MAX_NETWORK_PROFILES; i++) {
+		if (!registry.index[i].used) {
+			continue;
+		}
+
+		uint8_t buf[sizeof(wifiman_network_profile_t)
+			+ WIFIMAN_PASS_MAXLEN] = { 0, };
+		wifiman_network_profile_t *saved = (void *)buf;
+
+		if (!read_network_profile(saved, kv, i)) {
+			continue;
+		}
+		if (strcmp(profile->ssid, saved->ssid) == 0 &&
+				memcmp(profile->bssid, saved->bssid,
+					WIFIMAN_BSSID_MAXLEN) == 0) {
+			registry.index[i].used = false;
+			if (update_network_registry(&registry, kv)) {
+				rc = true;
+			}
+			break;
+		}
+	}
+
+	nvs_kvstore_close(kv);
+	return rc;
+}
+
+size_t wifiman_count_networks(void)
+{
+	size_t count;
+
+	pthread_mutex_lock(&m.lock);
+	{
+		count = count_saved_networks_internal();
+	}
+	pthread_mutex_unlock(&m.lock);
+
+	return count;
+}
+
+bool wifiman_save_network(const wifiman_network_profile_t *profile)
+{
+	bool rc;
+
+	pthread_mutex_lock(&m.lock);
+	{
+		rc = save_network_internal(profile);
+	}
+	pthread_mutex_unlock(&m.lock);
+
+	return rc;
+}
+
+bool wifiman_get_network(wifiman_network_profile_t *profile, uint8_t index)
+{
+	bool rc;
+
+	pthread_mutex_lock(&m.lock);
+	{
+		rc = get_network_internal(profile, index);
+	}
+	pthread_mutex_unlock(&m.lock);
+
+	return rc;
+}
+
+bool wifiman_clear_networks(void)
+{
+	bool rc;
+
+	pthread_mutex_lock(&m.lock);
+	{
+		rc = clear_networks_internal();
+	}
+	pthread_mutex_unlock(&m.lock);
+
+	return rc;
+}
+
+bool wifiman_delete_network(const wifiman_network_profile_t *profile)
+{
+	bool rc;
+
+	pthread_mutex_lock(&m.lock);
+	{
+		rc = delete_network(profile);
+	}
+	pthread_mutex_unlock(&m.lock);
+
+	return rc;
 }
