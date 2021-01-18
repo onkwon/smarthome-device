@@ -16,7 +16,7 @@ APPLOADER := $(OUTDIR)/apploader
 APPLOADER_SRCS := \
 	$(PLATFORM_DIR)/src/dfu_flash.c \
 	$(PLATFORM_DIR)/src/sha256.c \
-	src/dfu/dfu.c \
+	components/dfu/dfu.c \
 	components/apploader/main.c
 APPLOADER_OBJS := $(addprefix $(APPLOADER)/, $(APPLOADER_SRCS:.c=.o))
 DEPS += $(APPLOADER_OBJS:.o=.d)

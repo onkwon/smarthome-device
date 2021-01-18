@@ -9,7 +9,7 @@
 #include "libmcu/logging.h"
 #include "libmcu/compiler.h"
 #include "mqtt_client.h"
-#include "include/jobpool.h"
+#include "jobpool.h"
 
 #if !defined(MQTT_MAX_SUBSCRIPTIONS)
 #define MQTT_MAX_SUBSCRIPTIONS		10

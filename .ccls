@@ -4,8 +4,16 @@ clang
 
 -Iinclude
 -Icomponents/httpsrv/include
--Iexternal/libmcu/include
--Iexternal/libmcu/include/libmcu/posix
+
+-Iexternal/libmcu/components/common/include
+-Iexternal/libmcu/components/common/include/libmcu/posix
+-Iexternal/libmcu/components/jobqueue/include
+-Iexternal/libmcu/components/logging/include
+-Iexternal/libmcu/components/pubsub/include
+-Iexternal/libmcu/components/retry/include
+-Iexternal/libmcu/components/shell/include
+-Iexternal/libmcu/components/timext/include
+
 -I/usr/local/Cellar/cpputest/4.0/include
 
 -isystem /usr/local/include

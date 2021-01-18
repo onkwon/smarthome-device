@@ -1,6 +1,6 @@
 #include "ota/protocol/mqtt.h"
 #include "mqtt.h"
-#include "../../topic.h"
+#include "topic.h"
 
 static struct {
 	void (*ota_data_handler)(void *context,

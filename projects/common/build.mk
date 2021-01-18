@@ -19,31 +19,32 @@ DEFAULT_PROJECT ?= nodemcu
 PROJECT := $(DEFAULT_PROJECT)
 endif
 
-OUTDIR := $(BUILDIR)/$(PROJECT)
-OUTELF := $(OUTDIR)/$(PROJECT)
-OUTBIN := $(OUTDIR)/$(PROJECT).bin
-OUTLIB := $(OUTDIR)/lib$(PROJECT).a
+COMPONENTS_DIRS += \
+	components/httpsrv \
+	components/provisioning \
+	components/dfu \
+	components/ota
+COMPONENTS_INCS += \
+	components/httpsrv/include \
+	components/provisioning/include \
+	components/dfu/include \
+	components/ota/include
 
--include projects/$(PROJECT).mk
-include projects/common/toolchain.mk
-
-COMPONENTS_DIRS += components/httpsrv
-COMPONENTS_INCS += components/httpsrv/include
-
-SRCDIRS += src $(COMPONENTS_DIRS)
+LIBMCU_ROOT ?= external/libmcu
+LIBMCU_COMPONENTS := logging pubsub jobqueue retry timext
+include $(LIBMCU_ROOT)/projects/components.mk
 
 EXTRA_SRCS += \
-	external/libmcu/src/pubsub.c \
+	external/libmcu/examples/jobpool.c \
 	external/libmcu/examples/memory_storage.c \
-	external/libmcu/src/ringbuf.c \
-	external/libmcu/src/retry.c \
-	external/libmcu/src/jobqueue.c \
-	external/libmcu/src/logging.c
+	$(LIBMCU_COMPONENTS_SRCS)
 EXTRA_INCS += \
 	external/libmcu/examples \
-	external/libmcu/include \
-	external/libmcu/include/libmcu/posix \
-	external
+	external \
+	$(LIBMCU_COMPONENTS_INCS) \
+	src
+
+SRCDIRS += src $(COMPONENTS_DIRS)
 
 SRCS += $(foreach dir, $(SRCDIRS), $(shell find $(dir) -type f -regex ".*\.c")) \
 	$(EXTRA_SRCS)
@@ -58,6 +59,14 @@ DEFS += \
 	VERSION_TAG=$(VERSION_TAG) \
 	VERSION=$(VERSION)
 LIBS +=
+
+OUTDIR := $(BUILDIR)/$(PROJECT)
+OUTELF := $(OUTDIR)/$(PROJECT)
+OUTBIN := $(OUTDIR)/$(PROJECT).bin
+OUTLIB := $(OUTDIR)/lib$(PROJECT).a
+
+-include projects/$(PROJECT).mk
+include projects/common/toolchain.mk
 
 .DEFAULT_GOAL :=
 all:: $(OUTPUT)

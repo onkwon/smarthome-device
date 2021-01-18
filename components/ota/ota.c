@@ -8,10 +8,10 @@
 #include "libmcu/logging.h"
 #include "libmcu/compiler.h"
 #include "libmcu/system.h"
+#include "libmcu/timext.h"
 
 #include "jobpool.h"
-#include "timext.h"
-#include "../topic.h"
+#include "topic.h"
 #include "dfu/dfu.h"
 
 #define DEFAULT_FILE_CHUNK_SIZE		128
@@ -133,7 +133,8 @@ static bool ota_run(void *handle, const ota_protocol_t *protocol,
 		return false;
 	}
 
-	unsigned int tout = timeout_set(OTA_TIMEOUT_SEC * 1000U);
+	unsigned int tout;
+	timeout_set(&tout, OTA_TIMEOUT_SEC * 1000U);
 	while (!timeout_is_expired(tout)) {
 		if (sem_timedwait(&next_chunk, RTT_TIMEOUT_MSEC) != 0) {
 			error("timed out");
