@@ -7,3 +7,6 @@
 [submodule "external/jsmn"]
 	path = external/jsmn
 	url = https://github.com/zserge/jsmn.git
+[submodule "external/esp-idf"]
+	path = external/esp-idf
+	url = https://github.com/espressif/esp-idf.git

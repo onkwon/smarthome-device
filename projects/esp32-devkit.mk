@@ -1,10 +1,10 @@
-PLATFORM_DIR := ports/esp8266
-BOARD_DIR := $(PLATFORM_DIR)/nodemcu
+PLATFORM_DIR := ports/esp32
+BOARD_DIR := $(PLATFORM_DIR)/devkit
 PREREQUISITES += $(OUTDIR)/include/sdkconfig.h
 
 OUTPUT := $(OUTDIR)/$(PROJECT)_final
 
-include ports/esp8266/esp8266.mk
+include ports/esp32/esp32.mk
 
 $(OUTPUT): $(OUTLIB)
 	$(info linking     $@)
@@ -20,22 +20,22 @@ $(OUTDIR)/include/sdkconfig.h:
 .PHONY: flash
 flash: all
 	python $(PLATFORM_SDK_DIR)/components/esptool_py/esptool/esptool.py \
-		--chip esp8266 \
+		--chip esp32 \
 		--port $(PORT) \
 		--baud 921600 \
 		--before default_reset \
 		--after hard_reset write_flash -z \
 		--flash_mode dio \
 		--flash_freq 40m \
-		--flash_size 4MB \
-		0x0 $(OUTDIR)/bootloader/bootloader.bin \
+		--flash_size detect \
+		0x1000 $(OUTDIR)/bootloader/bootloader.bin \
 		0x8000 $(OUTDIR)/partitions.bin \
 		0xd000 $(OUTDIR)/ota_data_initial.bin \
 		0x10000 $(OUTPUT).bin
 .PHONY: erase_flash
 erase_flash:
 	python $(PLATFORM_SDK_DIR)/components/esptool_py/esptool/esptool.py \
-		--chip esp8266 \
+		--chip esp32 \
 		--port $(PORT) \
 		--baud 921600 \
 		--before default_reset \
@@ -44,4 +44,3 @@ erase_flash:
 monitor:
 	$(PLATFORM_SDK_DIR)/tools/idf_monitor.py $(OUTPUT).elf \
 		--port $(PORT)
-	#python -m serial.tools.miniterm $(PORT) 115200
