@@ -1,6 +1,7 @@
 PLATFORM_DIR := ports/esp32
 BOARD_DIR := $(PLATFORM_DIR)/devkit
 PREREQUISITES += $(OUTDIR)/include/sdkconfig.h
+EXTRA_SRCS += $(wildcard $(BOARD_DIR)/src/*.c)
 
 OUTPUT := $(OUTDIR)/$(PROJECT)_final
 

@@ -2,6 +2,7 @@ PLATFORM := esp32
 PLATFORM_SDK_DIR := external/esp-idf
 
 SRCDIRS += $(PLATFORM_DIR)/src
+EXTRA_SRCS += external/libmcu/ports/freertos/semaphore.c
 
 CROSS_COMPILE ?= xtensa-esp32-elf
 CFLAGS += -mlongcalls

@@ -31,11 +31,11 @@ COMPONENTS_INCS += \
 	components/ota/include
 
 LIBMCU_ROOT ?= external/libmcu
-LIBMCU_COMPONENTS := logging pubsub jobqueue retry timext
+LIBMCU_COMPONENTS := logging pubsub jobqueue retry timext button
 include $(LIBMCU_ROOT)/projects/components.mk
 
 EXTRA_SRCS += \
-	external/libmcu/examples/jobpool.c \
+	external/libmcu/examples/jobpool_nointr.c \
 	external/libmcu/examples/memory_storage.c \
 	$(LIBMCU_COMPONENTS_SRCS)
 EXTRA_INCS += \
@@ -65,6 +65,10 @@ OUTELF := $(OUTDIR)/$(PROJECT)
 OUTBIN := $(OUTDIR)/$(PROJECT).bin
 OUTLIB := $(OUTDIR)/lib$(PROJECT).a
 
+OUTDEF := $(OUTDIR)/defines.txt
+OUTSRC := $(OUTDIR)/sources.txt
+OUTINC := $(OUTDIR)/includes.txt
+
 -include projects/$(PROJECT).mk
 include projects/common/toolchain.mk
 
@@ -80,12 +84,15 @@ all:: $(OUTPUT)
 		awk '{printf("ROM %\04710d / %\04710d (%.2f%%)\n", \
 		$$2, $$1, $$2/$$1*100)}'
 
-$(OUTDIR)/sources.txt: $(OUTELF)
+$(OUTDEF): $(OUTELF)
+	$(info generating  $@)
+	$(Q)echo $(sort $(DEFS)) | tr ' ' '\n' > $@
+$(OUTSRC): $(OUTELF)
 	$(info generating  $@)
 	$(Q)echo $(sort $(SRCS)) | tr ' ' '\n' > $@
-$(OUTDIR)/includes.txt: $(OUTELF)
+$(OUTINC): $(OUTELF)
 	$(info generating  $@)
-	$(Q)echo $(subst -I,,$(sort $(INCS))) | tr ' ' '\n' > $@
+	$(Q)echo $(sort $(INCS)) | tr ' ' '\n' > $@
 
 $(OUTELF).size: $(OUTELF)
 	$(info generating  $@)
@@ -118,6 +125,7 @@ $(OUTELF):: $(OBJS) $(LD_SCRIPT)
 
 $(OUTLIB): $(OBJS)
 	$(info archiving   $@)
+	$(Q)rm -f $@
 	$(Q)$(AR) $(ARFLAGS) $@ $^ 1> /dev/null 2>&1
 
 $(OBJS): $(OUTDIR)/%.o: %.c Makefile $(MAKEFILE_LIST) | $(PREREQUISITES)

@@ -43,7 +43,10 @@ void apploader_run(void)
 	dfu_init(dfu_flash());
 
 	if (dfu_has_update()) {
-		dfu_update();
+		if (!dfu_update()) {
+			// finish if invalid image or already written one
+			dfu_finish();
+		}
 	}
 
 	app_init();

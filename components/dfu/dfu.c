@@ -6,6 +6,8 @@
 #define DFU_COUNTER_SIZE		512
 #define BITS_PER_BYTE			8
 
+#define WRITE_BUFSIZE			512
+
 extern uint8_t __bootopt;
 extern uint8_t __app_partition;
 extern uint8_t __dfu_partition;
@@ -71,7 +73,7 @@ static void get_image_digest(const dfu_t *self,
 	sha256_t sha256;
 	sha256_start(&sha256);
 
-	uint8_t buf[128];
+	uint8_t buf[WRITE_BUFSIZE];
 	uintptr_t addr = self->baseaddr + sizeof(*image);
 	size_t n = image->datasize / sizeof(buf);
 	size_t remain = image->datasize % sizeof(buf);
@@ -107,7 +109,7 @@ static bool validate(const dfu_t *self, const dfu_image_t *image)
 
 static void copy_to_app_partition(dfu_t *dfu, const dfu_image_t *image)
 {
-	uint8_t buf[128];
+	uint8_t buf[WRITE_BUFSIZE];
 	uintptr_t dst = (uintptr_t)&__app_partition;
 	uintptr_t src = dfu->baseaddr + sizeof(*image);
 	size_t n = image->datasize / sizeof(buf);
@@ -170,6 +172,9 @@ bool dfu_update(void)
 	if (!validate(&dfu, &image)) {
 		return false;
 	}
+
+	// TODO: check if the image is the same one to the current app
+	// need to keep the header in app?
 
 	copy_to_app_partition(&dfu, &image);
 
@@ -245,10 +250,10 @@ int dfu_count(void)
 {
 	uint8_t buf[DFU_COUNTER_SIZE];
 	m.io->read(buf, m.counter, sizeof(buf));
-	// incresed by 2 per each update:
+	// NOTE: incresed by 2 per each update:
 	// +1 by app when requesting which result in odd number and
 	// +1 by loader when finishing which result in even number
-	return count_internal(buf) / 2;
+	return count_internal(buf)/* / 2 */;
 }
 
 int dfu_count_error(void)

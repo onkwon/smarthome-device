@@ -146,7 +146,6 @@ static bool ota_run(void *handle, const ota_protocol_t *protocol,
 			} else {
 				error("invalid image");
 			}
-			rc = dfu_register(m.dfu);
 			info("DFU #%d %s", dfu_count(), rc? "requested":"failed");
 			break;
 		}

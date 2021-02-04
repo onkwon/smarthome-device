@@ -2,6 +2,7 @@ PLATFORM := esp8266
 PLATFORM_SDK_DIR := external/ESP8266_RTOS_SDK
 
 SRCDIRS += $(PLATFORM_DIR)/src
+EXTRA_SRCS += external/libmcu/ports/freertos/semaphore.c
 
 CROSS_COMPILE ?= xtensa-lx106-elf
 CFLAGS += -mlongcalls -mtext-section-literals
@@ -65,6 +66,8 @@ $(OUTDIR)/$(PLATFORM).bin: $(OUTDIR)/$(PLATFORM).elf $(MAKEFILE_LIST) \
 		-T esp8266.peripherals.ld \
 		-Wl,--no-check-sections -u call_user_start -u g_esp_sys_info \
 		-L$(OUTDIR)/esp_common -lesp_common \
+		-u gpio_isr_handler_add -u gpio_install_isr_service \
+		-u gpio_config -u gpio_set_level -u gpio_get_level \
 		-u esp_reset_reason -u esp_get_free_heap_size \
 		-L$(OUTDIR)/esp_event -lesp_event  \
 		-u esp_event_loop_create_default -u esp_event_send \

@@ -1,4 +1,5 @@
 #include "libmcu/system.h"
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -111,5 +112,16 @@ int system_random(void)
 
 const char *system_get_serial_number_string(void)
 {
-	return "sn1234";
+	static char sn[16];
+	uint8_t buf[6];
+
+	if (esp_read_mac(buf, ESP_MAC_WIFI_STA) != ESP_OK) {
+		memset(buf, 0, sizeof(buf));
+	}
+
+	snprintf(sn, sizeof(sn)-1, "sn%02x%02x%02x%02x%02x%02x",
+			buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+	sn[15] = '\0';
+
+	return sn;
 }

@@ -1,8 +1,10 @@
 #include <assert.h>
+#include <time.h>
 
 #include "libmcu/logging.h"
 #include "libmcu/system.h"
 #include "libmcu/pubsub.h"
+#include "libmcu/button.h"
 
 #include "sleep.h"
 #include "jobpool.h"
@@ -32,6 +34,12 @@ void memory_storage_write_hook(const void *data, size_t size)
 	puts("\n");
 }
 
+static unsigned int get_time_ms(void)
+{
+	time_t t = time(NULL);
+	return (unsigned int)t;
+}
+
 int main(void)
 {
 	static uint8_t logbuf[1024];
@@ -40,6 +48,8 @@ int main(void)
 
 	bool initialized = jobpool_init();
 	assert(initialized == true);
+
+	button_init(get_time_ms, sleep_ms);
 
 	//mdns_test();
 	sntp_test();

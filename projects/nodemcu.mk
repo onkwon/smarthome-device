@@ -1,6 +1,7 @@
 PLATFORM_DIR := ports/esp8266
 BOARD_DIR := $(PLATFORM_DIR)/nodemcu
 PREREQUISITES += $(OUTDIR)/include/sdkconfig.h
+EXTRA_SRCS += $(wildcard $(BOARD_DIR)/src/*.c)
 
 OUTPUT := $(OUTDIR)/$(PROJECT)_final
 
@@ -10,6 +11,7 @@ $(OUTPUT): $(OUTLIB)
 	$(info linking     $@)
 	$(Q)$(MAKE) -C $(BOARD_DIR)/platform $(MAKEFLAGS) \
 		PLATFORM_BUILD_DIR=$(BASEDIR)/$(OUTDIR) \
+		PLATFORM_LINK_DEPENDENCY=$(BASEDIR)/$(OUTLIB) \
 		PLATFORM_PROJECT_NAME=$(notdir $@) 1> /dev/null
 $(OUTDIR)/include/sdkconfig.h:
 	$(info generating  $@ (this may take a while...))

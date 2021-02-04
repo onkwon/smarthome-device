@@ -1,7 +1,8 @@
 PLATFORM_DIR := ports/esp8266
-BOARD_DIR := $(PLATFORM_DIR)/sonoff/basic
+BOARD_DIR := $(PLATFORM_DIR)/tywe3s
 PREREQUISITES += $(OUTDIR)/$(PLATFORM).elf
 EXTRA_SRCS += $(wildcard $(BOARD_DIR)/src/*.c)
+DEFS += BUTTON_MAX=2
 
 OUTPUT := \
 	$(OUTBIN) \
@@ -9,8 +10,9 @@ OUTPUT := \
 	$(OUTELF).dump \
 	$(OUTELF).lst \
 	$(OUTELF).size \
-	$(OUTDIR)/sources.txt \
-	$(OUTDIR)/includes.txt
+	$(OUTDEF) \
+	$(OUTSRC) \
+	$(OUTINC)
 
 APPLOADER := $(OUTDIR)/apploader
 APPLOADER_SRCS := \
