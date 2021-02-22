@@ -8,6 +8,7 @@
 
 #include "libmcu/logging.h"
 #include "libmcu/compiler.h"
+#include "libmcu/system.h"
 #include "mqtt_client.h"
 #include "jobpool.h"
 
@@ -189,7 +190,6 @@ static void process_response(const mqtt_t * const mqtt,
 		info("Unsubscribed from %.*s", event->topic_len, event->topic);
 		break;
 	case MQTT_EVENT_PUBLISHED:
-		debug("Published to %.*s", event->topic_len, event->topic);
 		break;
 	default:
 		error("Unknown event id: %d.", event->event_id);
@@ -227,6 +227,10 @@ static void mqtt_event_handler(void *context,
 		mqtt->server.connected = false;
 		mqtt->subscription.length = 0;
 		info("Disconnected from the broker.");
+		// NOTE: can not re-establish the connection to the broker due
+		// to heap memory shortage when tls enabled. so reboot here as
+		// a workaround
+		system_reboot();
 		break;
 	case MQTT_EVENT_ERROR:
 		error("type: 0x%x", event->error_handle->error_type);

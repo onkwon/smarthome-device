@@ -1,8 +1,10 @@
 PLATFORM_DIR := ports/esp8266
 BOARD_DIR := $(PLATFORM_DIR)/tywe3s
 PREREQUISITES += $(OUTDIR)/$(PLATFORM).elf
-EXTRA_SRCS += $(wildcard $(BOARD_DIR)/src/*.c)
 DEFS += BUTTON_MAX=2
+EXTRA_SRCS += \
+	external/libmcu/examples/jobpool.c \
+	$(wildcard $(BOARD_DIR)/src/*.c)
 
 OUTPUT := \
 	$(OUTBIN) \

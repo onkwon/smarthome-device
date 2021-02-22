@@ -13,6 +13,8 @@ clang
 -Iexternal/libmcu/components/retry/include
 -Iexternal/libmcu/components/shell/include
 -Iexternal/libmcu/components/timext/include
+-Iexternal/libmcu/components/button/include
+-Iexternal/libmcu/components/metrics/include
 
 -I/usr/local/Cellar/cpputest/4.0/include
 

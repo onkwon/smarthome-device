@@ -24,13 +24,13 @@ static bool publish_to(void *context, const char *topic,
 
 static bool request(void *context, const void *data, size_t datasize)
 {
-	return publish_to(context, &TOPICS[TOPIC_SUB_VERSION_DATA][4],
+	return publish_to(context, TOPIC_SUB2PUB(TOPIC_SUB_VERSION_DATA),
 			data, datasize);
 }
 
 static bool report(void *context, const void *data, size_t datasize)
 {
-	return publish_to(context, &TOPICS[TOPIC_SUB_VERSION][4],
+	return publish_to(context, TOPIC_SUB2PUB(TOPIC_SUB_VERSION),
 			data, datasize);
 }
 

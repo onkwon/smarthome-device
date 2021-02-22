@@ -17,11 +17,17 @@
 #include "wifi.h"
 #include "mqtt.h"
 
+#define MAX(a, b)				((a) < (b)? (b) : (a))
+
 #define DEFAULT_MQTT_BROKER_ENDPOINT		""
 
 #if !defined(DEFAULT_HOSTNAME)
-#define DEFAULT_HOSTNAME			"smarthome"
+#define DEFAULT_HOSTNAME			"smartswitch"
 #endif
+
+#define x509_ca_cert				NULL
+#define x509_device_cert			NULL
+#define x509_device_key				NULL
 
 const char *TOPICS[TOPIC_MAX];
 
@@ -189,11 +195,28 @@ static void message_received(void * const context,
 static void version_received(void * const context,
 		const mqtt_message_t * const msg)
 {
-	info("Update requested from %s to %.*s",
-			&def2str(VERSION_TAG)[1],
-			msg->payload_size, msg->payload);
-
 	ota_start(context, msg->payload, msg->payload_size);
+}
+
+// TODO: Remove dependency
+#include "switch.h"
+static void room_received(void * const context,
+		const mqtt_message_t * const msg)
+{
+	debug("topic => %.*s", msg->topic_len, msg->topic);
+	debug("room message %.*s", msg->payload_size, msg->payload);
+	unused(context);
+
+	switch (msg->payload[0]) {
+	case '1':
+		switch_set(1, true);
+		break;
+	case '0':
+		switch_set(1, false);
+		break;
+	default:
+		break;
+	}
 }
 
 static bool subscribe_topics(void *context)
@@ -214,9 +237,18 @@ static bool subscribe_topics(void *context)
 			.context = context,
 		},
 	};
+	mqtt_subscribe_t room = {
+		.topic_filter = TOPICS[TOPIC_SUB_ROOM],
+		.qos = MQTT_QOS_1,
+		.callback = {
+			.run = room_received,
+			.context = context,
+		},
+	};
 
 	if (mqtt_subscribe(m.mqtt, &version) != MQTT_SUCCESS
-			|| mqtt_subscribe(m.mqtt, &logging) != MQTT_SUCCESS) {
+			|| mqtt_subscribe(m.mqtt, &logging) != MQTT_SUCCESS
+			|| mqtt_subscribe(m.mqtt, &room) != MQTT_SUCCESS) {
 		return false;
 	}
 
@@ -225,14 +257,16 @@ static bool subscribe_topics(void *context)
 
 static bool module_topic_init(const char *reporter_name)
 {
-	TOPICS[TOPIC_SUB_LOGGING]
-		= get_topic_path_allocated(1, reporter_name, "logging");
 	TOPICS[TOPIC_SUB_VERSION]
 		= get_topic_path_allocated(1, reporter_name, "version");
 	TOPICS[TOPIC_SUB_VERSION_DATA]
 		= get_topic_path_allocated(1, reporter_name, "version/data");
-	TOPICS[TOPIC_PUB_EVENT]
-		= get_topic_path_allocated(0, reporter_name, "event");
+	TOPICS[TOPIC_SUB_LOGGING]
+		= get_topic_path_allocated(1, reporter_name, "logging");
+	TOPICS[TOPIC_SUB_ROOM]
+		= get_topic_path_allocated(1, reporter_name, "room");
+	TOPICS[TOPIC_PUB_HEARTBEAT]
+		= get_topic_path_allocated(0, reporter_name, "heartbeat");
 	TOPICS[TOPIC_PUB_WILL]
 		= get_topic_path_allocated(0, reporter_name, "will");
 
@@ -245,23 +279,53 @@ static bool module_topic_init(const char *reporter_name)
 	return true;
 }
 
-bool reporter_send(const void *data, size_t data_size)
+static const char *get_report_topic_from_type(report_t type)
 {
-	// TODO: queue
-	debug("rssi %d", wifiman_get_rssi());
+	switch (type) {
+	case REPORT_HEARTBEAT:
+		return TOPICS[TOPIC_PUB_HEARTBEAT];
+	case REPORT_LOGGING:
+		return TOPIC_SUB2PUB(TOPIC_SUB_LOGGING);
+	case REPORT_ROOM:
+		return TOPIC_SUB2PUB(TOPIC_SUB_ROOM);
+	case REPORT_EVENT: /* fall through */
+	case REPORT_DATA: /* fall through */
+	default:
+		return NULL;
+	}
+}
+
+bool reporter_send(report_t type, const void *data, size_t data_size)
+{
+	const char *topic = get_report_topic_from_type(type);
+
+	if (topic == NULL) {
+		return false;
+	}
+
 	return mqtt_publish(m.mqtt, &(mqtt_message_t) {
 			.qos = MQTT_QOS_1,
-			.topic = TOPICS[TOPIC_PUB_EVENT],
+			.topic = topic,
 			.payload = (const uint8_t *)data,
 			.payload_size = data_size, })
 		== MQTT_SUCCESS;
 }
 
-bool reporter_send_event(const void *data, size_t data_size)
+bool reporter_send_event(report_t type, const void *data, size_t data_size)
 {
-	unused(data);
-	unused(data_size);
-	return false;
+	const char *topic = get_report_topic_from_type(type);
+
+	if (topic == NULL) {
+		return false;
+	}
+
+	return mqtt_publish(m.mqtt, &(mqtt_message_t) {
+			.qos = MQTT_QOS_1,
+			.retain = true,
+			.topic = topic,
+			.payload = (const uint8_t *)data,
+			.payload_size = data_size, })
+		== MQTT_SUCCESS;
 }
 
 bool reporter_collect(const void *data, size_t data_size)

@@ -31,11 +31,10 @@ COMPONENTS_INCS += \
 	components/ota/include
 
 LIBMCU_ROOT ?= external/libmcu
-LIBMCU_COMPONENTS := logging pubsub jobqueue retry timext button
+LIBMCU_COMPONENTS := logging pubsub jobqueue retry timext button metrics
 include $(LIBMCU_ROOT)/projects/components.mk
 
 EXTRA_SRCS += \
-	external/libmcu/examples/jobpool_nointr.c \
 	external/libmcu/examples/memory_storage.c \
 	$(LIBMCU_COMPONENTS_SRCS)
 EXTRA_INCS += \
@@ -51,9 +50,9 @@ SRCS += $(foreach dir, $(SRCDIRS), $(shell find $(dir) -type f -regex ".*\.c")) 
 OBJS += $(addprefix $(OUTDIR)/, $(SRCS:.c=.o))
 DEPS += $(OBJS:.o=.d)
 INCS += \
-	$(EXTRA_INCS) \
+	include \
 	$(COMPONENTS_INCS) \
-	include
+	$(EXTRA_INCS)
 DEFS += \
 	_POSIX_THREADS \
 	VERSION_TAG=$(VERSION_TAG) \

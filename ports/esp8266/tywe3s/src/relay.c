@@ -3,20 +3,19 @@
 #include <stdbool.h>
 #include "driver/gpio.h"
 
-// 2, 3, 5, 10, 15
-#define RELAY1_PIN			GPIO_NUM_15
-#define RELAY1_BIT			GPIO_Pin_15
-#define RELAY2_PIN			GPIO_NUM_10
-#define RELAY2_BIT			GPIO_Pin_10
+#define RELAY1_PIN			GPIO_NUM_4
+#define RELAY1_BIT			GPIO_Pin_4
+#define RELAY2_PIN			GPIO_NUM_13
+#define RELAY2_BIT			GPIO_Pin_13
 
-void relay_1_toggle(void)
+void relay_1_set(bool on)
 {
-	gpio_set_level(RELAY1_PIN, gpio_get_level(RELAY1_PIN) ^ 1);
+	gpio_set_level(RELAY1_PIN, on);
 }
 
-void relay_2_toggle(void)
+void relay_2_set(bool on)
 {
-	gpio_set_level(RELAY2_PIN, gpio_get_level(RELAY2_PIN) ^ 1);
+	gpio_set_level(RELAY2_PIN, on);
 }
 
 void relay_init(void)
@@ -27,4 +26,7 @@ void relay_init(void)
 		.mode = GPIO_MODE_OUTPUT,
 	};
 	gpio_config(&out_conf);
+
+	relay_1_set(0);
+	relay_2_set(0);
 }

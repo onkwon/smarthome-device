@@ -63,7 +63,14 @@ unsigned int system_get_free_heap_bytes(void)
 
 unsigned int system_get_current_stack_watermark(void)
 {
-	return uxTaskGetStackHighWaterMark(NULL);
+	//return uxTaskGetStackHighWaterMark(NULL);
+	return 0;
+}
+
+unsigned int system_get_heap_watermark(void)
+{
+	//return xPortGetMinimumEverFreeHeapSize();
+	return esp_get_free_heap_size();
 }
 
 const char *system_get_version_string(void)
@@ -107,7 +114,7 @@ void system_print_tasks_info(void)
 
 int system_random(void)
 {
-	return esp_random();
+	return (int)esp_random();
 }
 
 const char *system_get_serial_number_string(void)
